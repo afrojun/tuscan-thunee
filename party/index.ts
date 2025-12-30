@@ -457,8 +457,9 @@ export default class ThuneeServer implements Party.Server {
     if (this.state.phase !== "playing") return
     if (this.state.currentPlayerId !== playerId) return
     
-    // Close jodhi window and clear last trick result when a card is played
+    // Close previous windows and clear last trick result when a card is played
     this.state.jodhiWindow = false
+    this.state.challengeWindow = false  // Close previous challenge window
     this.state.lastTrickResult = null
 
     const player = this.state.players.find(p => p.id === playerId)
@@ -517,7 +518,8 @@ export default class ThuneeServer implements Party.Server {
     this.state.trickHistory.push({ ...this.state.currentTrick })
 
     this.state.tricksPlayed++
-    this.state.challengeWindow = false
+    // Keep challengeWindow open so last card can be challenged
+    // It will close when next card is played or round ends
     
     // Open jodhi window for winning team
     this.state.jodhiWindow = true
@@ -525,6 +527,7 @@ export default class ThuneeServer implements Party.Server {
 
     // Check if round is over (6 tricks for 4 players, 6 per round for 2 players)
     if (this.state.tricksPlayed === 6) {
+      this.state.challengeWindow = false // Close at end of round
       this.endRound()
     } else {
       // Winner leads next trick
