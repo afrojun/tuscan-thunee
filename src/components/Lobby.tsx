@@ -24,9 +24,10 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyPr
     navigator.clipboard.writeText(window.location.href)
   }
 
-  const expectedPlayers = gameState?.playerCount ?? 4
   const currentPlayers = gameState?.players.length ?? 0
-  const canStart = currentPlayers === expectedPlayers
+  // Only trust playerCount after at least one player has joined
+  const expectedPlayers = currentPlayers > 0 ? gameState!.playerCount : null
+  const canStart = expectedPlayers !== null && currentPlayers === expectedPlayers
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
@@ -50,7 +51,7 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyPr
 
         <div className="border-t-2 border-retro-black pt-4">
           <p className="font-mono text-sm text-retro-black mb-2">
-            Players ({currentPlayers}/{expectedPlayers}):
+            Players ({currentPlayers}/{expectedPlayers ?? '?'}):
           </p>
           <ul className="space-y-1 mb-4">
             {gameState?.players.map((p, i) => (
@@ -68,7 +69,7 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyPr
                 </span>
               </li>
             ))}
-            {Array.from({ length: expectedPlayers - currentPlayers }).map((_, i) => (
+            {expectedPlayers !== null && Array.from({ length: expectedPlayers - currentPlayers }).map((_, i) => (
               <li key={`empty-${i}`} className="font-mono text-sm text-gray-400 px-2 py-1">
                 Waiting...
               </li>

@@ -6,6 +6,8 @@ import { BiddingPanel } from './BiddingPanel'
 import { TrumpSelector } from './TrumpSelector'
 import { CardBack } from './Card'
 import { GameHeader } from './GameHeader'
+import { ChallengeResultModal } from './ChallengeResultModal'
+import { JodhiButton } from './JodhiButton'
 
 interface GameBoardProps {
   gameState: GameState
@@ -43,6 +45,26 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
     onAction({ type: 'challenge' })
   }
 
+  const handleCallJodhi = (suit: Suit) => {
+    onAction({ type: 'call-jodhi', suit })
+  }
+
+  const canCallJodhi = () => {
+    if (!gameState.jodhiWindow || isSpectator || !currentPlayer) return false
+    return currentPlayer.team === gameState.lastTrickWinningTeam
+  }
+
+  const myCalledJodhiSuits = gameState.jodhiCalls
+    .filter(j => j.playerId === playerId)
+    .map(j => j.suit)
+
+  // Check if player can challenge (must be on opponent team of last played card)
+  const canChallenge = () => {
+    if (!gameState.challengeWindow || !gameState.lastPlayedCard || isSpectator) return false
+    const lastPlayer = gameState.players.find(p => p.id === gameState.lastPlayedCard!.playerId)
+    return lastPlayer && currentPlayer && lastPlayer.team !== currentPlayer.team
+  }
+
   // Get opponent info based on player count
   const getOpponent = (offset: number) => {
     const idx = (playerIndex + offset) % gameState.playerCount
@@ -73,6 +95,10 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         teams={gameState.teams}
         players={gameState.players}
         currentBid={gameState.bidState.currentBid}
+        playerCount={gameState.playerCount}
+        dealRound={gameState.dealRound}
+        phase={gameState.phase}
+        jodhiCalls={gameState.jodhiCalls}
       />
 
       {/* Top opponent (partner in 4p, opponent in 2p) */}
@@ -136,8 +162,19 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
                 trump={gameState.trump}
               />
 
-              {/* Challenge button */}
-              {gameState.challengeWindow && !isSpectator && gameState.lastPlayedCard?.playerId !== playerId && (
+              {/* Jodhi button - only for winning team after trick */}
+              {canCallJodhi() && currentPlayer && (
+                <JodhiButton
+                  hand={currentPlayer.hand}
+                  trump={gameState.trump}
+                  calledJodhiSuits={myCalledJodhiSuits}
+                  onCallJodhi={handleCallJodhi}
+                  disabled={false}
+                />
+              )}
+
+              {/* Challenge button - only for opponent team */}
+              {canChallenge() && (
                 <div className="text-center">
                   <button
                     onClick={handleChallenge}
@@ -218,6 +255,19 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
                           font-retro text-4xl text-retro-gold animate-pulse pointer-events-none">
             THUNEE!
           </div>
+        )}
+
+        {/* Challenge result modal */}
+        {gameState.challengeResult && (
+          <ChallengeResultModal
+            challengerId={gameState.challengeResult.challengerId}
+            accusedId={gameState.challengeResult.accusedId}
+            card={gameState.challengeResult.card}
+            wasValid={gameState.challengeResult.wasValid}
+            winningTeam={gameState.challengeResult.winningTeam}
+            players={gameState.players}
+            onDismiss={() => {}}
+          />
         )}
       </div>
     </div>

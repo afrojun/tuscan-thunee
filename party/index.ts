@@ -49,7 +49,11 @@ export default class ThuneeServer implements Party.Server {
     const stored = await this.room.storage.get<string>("state")
     if (stored) {
       try {
-        this.state = deserializeState(stored)
+        const loadedState = deserializeState(stored)
+        // Only restore state if there were players (avoid stale empty games)
+        if (loadedState.players.length > 0 || loadedState.phase !== 'waiting') {
+          this.state = loadedState
+        }
       } catch {
         this.state = createInitialState(this.room.id, 4)
       }
@@ -129,7 +133,7 @@ export default class ThuneeServer implements Party.Server {
         this.handleCallThunee(playerId)
         break
       case "call-jodhi":
-        this.handleCallJodhi(playerId, msg.points)
+        this.handleCallJodhi(playerId, msg.suit)
         break
       case "play-card":
         this.handlePlayCard(playerId, msg.card)
@@ -198,9 +202,12 @@ export default class ThuneeServer implements Party.Server {
     this.state.trumpCallerId = null
     this.state.thuneeCallerId = null
     this.state.jodhiCalls = []
+    this.state.jodhiWindow = false
+    this.state.lastTrickWinningTeam = null
     this.state.currentTrick = createEmptyTrick()
     this.state.tricksPlayed = 0
     this.state.trickHistory = []
+    this.state.challengeResult = null
 
     // Reset hands
     for (const player of this.state.players) {
@@ -208,10 +215,19 @@ export default class ThuneeServer implements Party.Server {
     }
 
     // Deal first 4 cards to each player
-    const cardsPerPlayer = 4
-    for (let i = 0; i < this.state.playerCount; i++) {
-      const start = i * cardsPerPlayer
-      this.state.players[i].hand = this.deck.slice(start, start + cardsPerPlayer)
+    if (this.state.playerCount === 4) {
+      // 4-player: 4 cards each from first 16 cards
+      for (let i = 0; i < 4; i++) {
+        const start = i * 4
+        this.state.players[i].hand = this.deck.slice(start, start + 4)
+      }
+    } else {
+      // 2-player: 4 cards each from first 8 cards
+      // Player 0: cards 0-3, Player 1: cards 4-7
+      for (let i = 0; i < 2; i++) {
+        const start = i * 4
+        this.state.players[i].hand = this.deck.slice(start, start + 4)
+      }
     }
 
     // Move to calling phase with timer
@@ -296,13 +312,25 @@ export default class ThuneeServer implements Party.Server {
   }
 
   endBidding() {
-    // Deal remaining 2 cards
-    const startIndex = this.state.playerCount * 4
-    for (let i = 0; i < this.state.playerCount; i++) {
-      const card1 = this.deck[startIndex + i * 2]
-      const card2 = this.deck[startIndex + i * 2 + 1]
-      if (card1) this.state.players[i].hand.push(card1)
-      if (card2) this.state.players[i].hand.push(card2)
+    // Deal remaining 2 cards to complete hand of 6
+    if (this.state.playerCount === 4) {
+      // 4-player: cards 16-23 (2 per player)
+      const startIndex = 16
+      for (let i = 0; i < 4; i++) {
+        const card1 = this.deck[startIndex + i * 2]
+        const card2 = this.deck[startIndex + i * 2 + 1]
+        if (card1) this.state.players[i].hand.push(card1)
+        if (card2) this.state.players[i].hand.push(card2)
+      }
+    } else {
+      // 2-player: cards 8-11 (2 per player)
+      // Player 0: cards 8, 9; Player 1: cards 10, 11
+      for (let i = 0; i < 2; i++) {
+        const card1 = this.deck[8 + i * 2]
+        const card2 = this.deck[8 + i * 2 + 1]
+        if (card1) this.state.players[i].hand.push(card1)
+        if (card2) this.state.players[i].hand.push(card2)
+      }
     }
 
     if (this.state.bidState.bidderId) {
@@ -348,19 +376,52 @@ export default class ThuneeServer implements Party.Server {
     this.state.phase = "playing"
   }
 
-  handleCallJodhi(playerId: string, points: number) {
+  handleCallJodhi(playerId: string, suit: Suit) {
     if (this.state.phase !== "playing") return
+    if (!this.state.jodhiWindow) return
     
-    // Can only call jodhi after winning 1st or 3rd trick
-    const player = this.state.players.find(p => p.id === playerId)
-    if (!player) return
-
-    this.state.jodhiCalls.push({ playerId, points })
+    // Caller must be on the winning team
+    const caller = this.state.players.find(p => p.id === playerId)
+    if (!caller) return
+    if (caller.team !== this.state.lastTrickWinningTeam) return
+    
+    // Check if already called Jodhi for this suit by this player
+    const alreadyCalled = this.state.jodhiCalls.some(j => 
+      j.playerId === playerId && j.suit === suit
+    )
+    if (alreadyCalled) return
+    
+    // Check if player has Q+K in the suit (honor system, but validate they have cards)
+    const hasQ = caller.hand.some(c => c.suit === suit && c.rank === 'Q')
+    const hasK = caller.hand.some(c => c.suit === suit && c.rank === 'K')
+    const hasJ = caller.hand.some(c => c.suit === suit && c.rank === 'J')
+    
+    // Must have at least Q+K (honor system - we trust the player)
+    if (!hasQ || !hasK) return
+    
+    // Calculate points
+    const isTrump = suit === this.state.trump
+    let points: number
+    if (hasJ) {
+      points = isTrump ? 50 : 30
+    } else {
+      points = isTrump ? 40 : 20
+    }
+    
+    this.state.jodhiCalls.push({
+      playerId,
+      points,
+      suit,
+      hasJack: hasJ
+    })
   }
 
   handlePlayCard(playerId: string, card: Card) {
     if (this.state.phase !== "playing") return
     if (this.state.currentPlayerId !== playerId) return
+    
+    // Close jodhi window when a card is played
+    this.state.jodhiWindow = false
 
     const player = this.state.players.find(p => p.id === playerId)
     if (!player) return
@@ -406,6 +467,10 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.tricksPlayed++
     this.state.challengeWindow = false
+    
+    // Open jodhi window for winning team
+    this.state.jodhiWindow = true
+    this.state.lastTrickWinningTeam = winner.team
 
     // Check if round is over (6 tricks for 4 players, 6 per round for 2 players)
     if (this.state.tricksPlayed === 6) {
@@ -423,25 +488,67 @@ export default class ThuneeServer implements Party.Server {
     if (lastTrick?.winnerId) {
       const lastWinner = this.state.players.find(p => p.id === lastTrick.winnerId)
       if (lastWinner) {
-        // The team that LOSES last trick gives 10 to opponent
-        const losingTeam = lastWinner.team === 0 ? 1 : 0
         this.state.teams[lastWinner.team].cardPoints += 10
       }
     }
 
-    // Calculate ball awards
-    const trumpTeam = this.state.players.find(p => p.id === this.state.trumpCallerId)?.team ?? 0
-    const countingTeam = trumpTeam === 0 ? 1 : 0
-
-    const target = 105 - this.state.bidState.currentBid
-    const countingScore = this.state.teams[countingTeam].cardPoints
-
-    if (this.state.thuneeCallerId) {
-      // Thunee was called
+    // 2-player mode: check for Thunee in Round 1 (resolves immediately)
+    if (this.state.playerCount === 2 && this.state.dealRound === 1 && this.state.thuneeCallerId) {
       const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
       const thuneeTeam = thuneePlayer.team
       
-      // Check if thunee team won all 6 tricks
+      const wonAllTricks = this.state.trickHistory.every(t => {
+        const winner = this.state.players.find(p => p.id === t.winnerId)
+        return winner?.team === thuneeTeam
+      })
+
+      if (wonAllTricks) {
+        this.state.teams[thuneeTeam].balls += 4
+      } else {
+        const otherTeam = thuneeTeam === 0 ? 1 : 0
+        this.state.teams[otherTeam].balls += 4
+      }
+
+      if (this.checkGameOver()) return
+      this.state.phase = "round-end"
+      this.rotateDealerAndReset()
+      return
+    }
+
+    // 2-player mode: after Round 1 (no Thunee), go to Round 2 without awarding balls
+    if (this.state.playerCount === 2 && this.state.dealRound === 1) {
+      this.state.dealRound = 2
+      this.startSecondRound()
+      return
+    }
+
+    // Award balls (after Round 2 in 2-player, or after 6 tricks in 4-player)
+    const trumpTeam = this.state.players.find(p => p.id === this.state.trumpCallerId)?.team ?? 0
+    const countingTeam = trumpTeam === 0 ? 1 : 0
+    
+    // Calculate Jodhi points by team
+    let trumpTeamJodhi = 0
+    let countingTeamJodhi = 0
+    
+    for (const jodhi of this.state.jodhiCalls) {
+      const jodhiPlayer = this.state.players.find(p => p.id === jodhi.playerId)
+      if (jodhiPlayer?.team === trumpTeam) {
+        trumpTeamJodhi += jodhi.points
+      } else {
+        countingTeamJodhi += jodhi.points
+      }
+    }
+    
+    // Adjusted target and score with Jodhi
+    const target = 105 - this.state.bidState.currentBid + trumpTeamJodhi
+    const countingScore = this.state.teams[countingTeam].cardPoints + countingTeamJodhi
+
+    if (this.state.thuneeCallerId) {
+      // Thunee in 4-player mode or Round 2 of 2-player
+      const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
+      const thuneeTeam = thuneePlayer.team
+      
+      // For 2-player Round 2, check all 12 tricks
       const wonAllTricks = this.state.trickHistory.every(t => {
         const winner = this.state.players.find(p => p.id === t.winnerId)
         return winner?.team === thuneeTeam
@@ -462,39 +569,43 @@ export default class ThuneeServer implements Party.Server {
       }
     }
 
-    // Check for game over
-    if (this.state.teams[0].balls >= 13) {
+    if (this.checkGameOver()) return
+    this.state.phase = "round-end"
+    this.rotateDealerAndReset()
+  }
+
+  checkGameOver(): boolean {
+    if (this.state.teams[0].balls >= 13 || this.state.teams[1].balls >= 13) {
       this.state.phase = "game-over"
-    } else if (this.state.teams[1].balls >= 13) {
-      this.state.phase = "game-over"
-    } else if (this.state.playerCount === 2 && this.state.dealRound === 1) {
-      // 2-player mode: start second round
-      this.state.dealRound = 2
-      this.startSecondRound()
-    } else {
-      // New deal
-      this.state.phase = "round-end"
-      this.rotateDealerAndReset()
+      return true
     }
+    return false
   }
 
   startSecondRound() {
-    // Deal next 6 cards to each player (cards 12-23 from deck)
-    const startIndex = 12
+    // Deal remaining 12 cards (6 to each player)
+    // Player 0 gets cards 12-17, Player 1 gets cards 18-23
     for (let i = 0; i < 2; i++) {
       this.state.players[i].hand = []
-      for (let j = 0; j < 4; j++) {
-        this.state.players[i].hand.push(this.deck[startIndex + i * 6 + j])
+      for (let j = 0; j < 6; j++) {
+        this.state.players[i].hand.push(this.deck[12 + i * 6 + j])
       }
     }
     
-    this.state.phase = "bidding"
-    this.state.bidState = createEmptyBidState()
+    // Skip directly to playing - trump and bid carry over
+    this.state.phase = "playing"
     this.state.currentTrick = createEmptyTrick()
     this.state.tricksPlayed = 0
+    // Don't reset trickHistory - need full history for cumulative scoring
     
-    const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-    this.state.currentPlayerId = this.state.players[(dealerIndex + 1) % 2].id
+    // Winner of last trick from Round 1 leads
+    const lastTrick = this.state.trickHistory[this.state.trickHistory.length - 1]
+    if (lastTrick?.winnerId) {
+      this.state.currentPlayerId = lastTrick.winnerId
+    } else {
+      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
+      this.state.currentPlayerId = this.state.players[(dealerIndex + 1) % 2].id
+    }
   }
 
   rotateDealerAndReset() {
@@ -519,28 +630,43 @@ export default class ThuneeServer implements Party.Server {
     if (!challenger || !accused) return
     if (challenger.team === accused.team) return // Can't challenge teammate
 
-    // Check if the play was valid
-    // We need to reconstruct what the player's hand was before the play
-    const trick = this.state.currentTrick
     const card = this.state.lastPlayedCard.card
     
-    // The hand after playing + the played card = hand before
+    // Reconstruct the hand before the play
     const handBefore = [...accused.hand, card]
     
-    const validation = isValidPlay(card, handBefore, {
-      ...trick,
-      cards: trick.cards.slice(0, -1) // Remove the challenged card
-    }, this.state.trump)
+    // Build trick state before the challenged card was played
+    const trickBefore = {
+      ...this.state.currentTrick,
+      cards: this.state.currentTrick.cards.filter(c => c.playerId !== accused.id)
+    }
 
+    const validation = isValidPlay(card, handBefore, trickBefore, this.state.trump)
+
+    // Determine winning team: if play was valid, accused's team wins (bad challenge)
+    // If play was invalid, challenger's team wins (caught cheating)
+    const winningTeam = validation.valid ? accused.team : challenger.team
+
+    // Store challenge result for UI
+    this.state.challengeResult = {
+      challengerId,
+      accusedId: accused.id,
+      card,
+      wasValid: validation.valid,
+      winningTeam
+    }
+
+    // Award 4 balls to winning team
+    this.state.teams[winningTeam].balls += 4
+
+    // End round immediately
     this.state.challengeWindow = false
-
-    if (!validation.valid) {
-      // Challenge successful - accused team loses 4 balls
-      this.state.teams[accused.team].balls = Math.max(0, this.state.teams[accused.team].balls - 4)
-      // Could also award 4 balls to challenger team instead
+    
+    // Check for game over
+    if (this.state.teams[0].balls >= 13 || this.state.teams[1].balls >= 13) {
+      this.state.phase = "game-over"
     } else {
-      // Challenge failed - challenger team loses 4 balls  
-      this.state.teams[challenger.team].balls = Math.max(0, this.state.teams[challenger.team].balls - 4)
+      this.state.phase = "round-end"
     }
   }
 }

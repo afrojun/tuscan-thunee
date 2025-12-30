@@ -76,7 +76,14 @@ export interface GameState {
   
   // Special calls
   thuneeCallerId: string | null
-  jodhiCalls: { playerId: string; points: number }[]
+  jodhiCalls: { 
+    playerId: string
+    points: number
+    suit: Suit
+    hasJack: boolean
+  }[]
+  jodhiWindow: boolean
+  lastTrickWinningTeam: 0 | 1 | null
   
   // Current trick
   currentTrick: Trick
@@ -89,6 +96,13 @@ export interface GameState {
   // For challenge system
   lastPlayedCard: { playerId: string; card: Card } | null
   challengeWindow: boolean
+  challengeResult: {
+    challengerId: string
+    accusedId: string
+    card: Card
+    wasValid: boolean
+    winningTeam: 0 | 1
+  } | null
   
   // History for disputes
   trickHistory: Trick[]
@@ -102,7 +116,7 @@ export type ClientMessage =
   | { type: 'pass' }
   | { type: 'set-trump'; suit: Suit; lastCard?: boolean }
   | { type: 'call-thunee' }
-  | { type: 'call-jodhi'; points: number }
+  | { type: 'call-jodhi'; suit: Suit }
   | { type: 'call-trumpless' }
   | { type: 'play-card'; card: Card }
   | { type: 'challenge' }

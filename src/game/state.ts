@@ -19,6 +19,8 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     
     thuneeCallerId: null,
     jodhiCalls: [],
+    jodhiWindow: false,
+    lastTrickWinningTeam: null,
     
     currentTrick: createEmptyTrick(),
     tricksPlayed: 0,
@@ -28,6 +30,7 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     
     lastPlayedCard: null,
     challengeWindow: false,
+    challengeResult: null,
     
     trickHistory: [],
   }
