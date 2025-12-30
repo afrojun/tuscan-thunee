@@ -3,13 +3,20 @@ import type { BidState } from '@/game/types'
 
 interface BiddingPanelProps {
   bidState: BidState
-  isCurrentPlayer: boolean
-  currentBidderName: string
+  currentCallerName: string | null
+  hasPassed: boolean
   onBid: (amount: number) => void
   onPass: () => void
 }
 
-export function BiddingPanel({ bidState, isCurrentPlayer, currentBidderName, onBid, onPass }: BiddingPanelProps) {
+export function BiddingPanel({ 
+  bidState,
+  currentCallerName, 
+  hasPassed,
+  onBid, 
+  onPass 
+}: BiddingPanelProps) {
+  const [timeLeft, setTimeLeft] = useState(0)
   const minBid = Math.max(10, bidState.currentBid + 10)
   const [selectedBid, setSelectedBid] = useState(minBid)
 
@@ -17,6 +24,23 @@ export function BiddingPanel({ bidState, isCurrentPlayer, currentBidderName, onB
   useEffect(() => {
     setSelectedBid(minBid)
   }, [minBid])
+
+  // Timer countdown
+  useEffect(() => {
+    if (!bidState.timerEndsAt) {
+      setTimeLeft(0)
+      return
+    }
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, bidState.timerEndsAt! - Date.now())
+      setTimeLeft(Math.ceil(remaining / 1000))
+    }
+
+    updateTimer()
+    const interval = setInterval(updateTimer, 100)
+    return () => clearInterval(interval)
+  }, [bidState.timerEndsAt])
 
   const bidOptions = []
   for (let b = minBid; b <= 100; b += 10) {
@@ -26,61 +50,65 @@ export function BiddingPanel({ bidState, isCurrentPlayer, currentBidderName, onB
     bidOptions.push(104)
   }
 
-  if (!isCurrentPlayer) {
-    return (
-      <div className="card-container p-4 text-center space-y-2">
-        <p className="font-retro text-xs text-retro-black">BIDDING</p>
-        <p className="font-mono text-sm text-retro-black">
-          <span className="text-retro-red">{currentBidderName}</span>'s turn
-        </p>
-        {bidState.currentBid > 0 && (
-          <p className="font-mono text-xs text-gray-600">
-            Current bid: {bidState.currentBid}
-          </p>
-        )}
-      </div>
-    )
-  }
-
   return (
-    <div className="card-container p-4 space-y-3">
-      <p className="font-retro text-xs text-retro-gold text-center">YOUR TURN TO BID</p>
-      
-      {bidState.currentBid > 0 && (
-        <p className="font-mono text-xs text-gray-600 text-center">
-          Current bid: {bidState.currentBid}
+    <div className="card-container p-4 space-y-3 w-full max-w-xs">
+      {/* Timer */}
+      <div className="text-center">
+        <div className={`font-retro text-2xl ${timeLeft <= 3 ? 'text-retro-red animate-pulse' : 'text-retro-black'}`}>
+          {timeLeft}s
+        </div>
+        <p className="font-retro text-xs text-retro-black mt-1">CALLING</p>
+      </div>
+
+      {/* Current call info */}
+      {bidState.currentBid > 0 ? (
+        <p className="font-mono text-sm text-center text-retro-black">
+          <span className="text-retro-red font-bold">{currentCallerName}</span> called {bidState.currentBid}
+        </p>
+      ) : (
+        <p className="font-mono text-sm text-center text-gray-600">
+          No calls yet
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 justify-center">
-        {bidOptions.slice(0, 6).map((amount) => (
-          <button
-            key={amount}
-            onClick={() => setSelectedBid(amount)}
-            className={`px-3 py-2 font-mono text-sm border-2 border-retro-black
-              ${selectedBid === amount 
-                ? 'bg-retro-black text-retro-cream' 
-                : 'bg-retro-cream text-retro-black'}`}
-          >
-            {amount}
-          </button>
-        ))}
-      </div>
+      {/* Actions */}
+      {hasPassed ? (
+        <p className="font-mono text-sm text-center text-gray-500 py-4">
+          You passed
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {bidOptions.slice(0, 6).map((amount) => (
+              <button
+                key={amount}
+                onClick={() => setSelectedBid(amount)}
+                className={`px-3 py-2 font-mono text-sm border-2 border-retro-black
+                  ${selectedBid === amount 
+                    ? 'bg-retro-black text-retro-cream' 
+                    : 'bg-retro-cream text-retro-black'}`}
+              >
+                {amount}
+              </button>
+            ))}
+          </div>
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => onBid(selectedBid)}
-          className="btn-retro flex-1"
-        >
-          BID {selectedBid}
-        </button>
-        <button
-          onClick={onPass}
-          className="btn-danger flex-1"
-        >
-          PASS
-        </button>
-      </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onBid(selectedBid)}
+              className="btn-retro flex-1"
+            >
+              CALL {selectedBid}
+            </button>
+            <button
+              onClick={onPass}
+              className="btn-danger flex-1"
+            >
+              PASS
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

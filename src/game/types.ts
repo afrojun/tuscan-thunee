@@ -52,6 +52,7 @@ export interface BidState {
   currentBid: number
   bidderId: string | null
   passed: Set<string>
+  timerEndsAt: number | null // Unix timestamp when timer expires
 }
 
 export interface GameState {

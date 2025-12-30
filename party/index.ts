@@ -34,6 +34,8 @@ interface ConnectionState {
   playerId: string
 }
 
+const CALL_TIMER_MS = 10000 // 10 seconds
+
 export default class ThuneeServer implements Party.Server {
   state: GameState
   deck: Card[] = []
@@ -212,18 +214,59 @@ export default class ThuneeServer implements Party.Server {
       this.state.players[i].hand = this.deck.slice(start, start + cardsPerPlayer)
     }
 
-    // Move to bidding phase
+    // Move to calling phase with timer
     this.state.phase = "bidding"
+    this.state.currentPlayerId = null // Anyone can call
+    this.startCallTimer()
+  }
+
+  async startCallTimer() {
+    // Set timer end time
+    this.state.bidState.timerEndsAt = Date.now() + CALL_TIMER_MS
+
+    // Use PartyKit's alarm API for reliable server-side timer
+    await this.room.storage.setAlarm(Date.now() + CALL_TIMER_MS)
+
+    await this.saveState()
+    this.broadcastState()
+  }
+
+  // PartyKit alarm handler - called when alarm fires
+  async onAlarm() {
+    if (this.state.phase === "bidding") {
+      this.onCallTimerExpired()
+    }
+  }
+
+  onCallTimerExpired() {
+    if (this.state.phase !== "bidding") return
+
+    this.state.bidState.timerEndsAt = null
+
+    // Check if everyone passed or no one called
+    const allPassed = this.state.players.every(p => this.state.bidState.passed.has(p.id))
+    const noCalls = this.state.bidState.currentBid === 0
+
+    if (allPassed || noCalls) {
+      // Default: dealer's RHO sets trump
+      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
+      const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
+      this.state.trumpCallerId = this.state.players[rhoIndex].id
+      this.state.bidState.bidderId = null // No bid was made
+    }
     
-    // Player to dealer's right starts bidding (counterclockwise from dealer)
-    const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-    const starterIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
-    this.state.currentPlayerId = this.state.players[starterIndex].id
+    this.endBidding()
+    this.saveState()
+    this.broadcastState()
   }
 
   handleBid(playerId: string, amount: number) {
     if (this.state.phase !== "bidding") return
-    if (this.state.currentPlayerId !== playerId) return
+    
+    // Check if player has passed
+    if (this.state.bidState.passed.has(playerId)) return
+    
+    // Validate bid amount
     if (amount <= this.state.bidState.currentBid) return
     if (amount > 104) return
     if (amount % 10 !== 0 && amount !== 104) return
@@ -231,45 +274,25 @@ export default class ThuneeServer implements Party.Server {
     this.state.bidState.currentBid = amount
     this.state.bidState.bidderId = playerId
 
-    this.advanceBidding(playerId)
+    // Reset timer for others to counter-call
+    this.startCallTimer()
   }
 
-  handlePass(playerId: string) {
+  async handlePass(playerId: string) {
     if (this.state.phase !== "bidding") return
-    if (this.state.currentPlayerId !== playerId) return
+    
+    // Can't pass twice
+    if (this.state.bidState.passed.has(playerId)) return
 
     this.state.bidState.passed.add(playerId)
-    this.advanceBidding(playerId)
-  }
 
-  advanceBidding(currentPlayerId: string) {
-    const currentIndex = this.state.players.findIndex(p => p.id === currentPlayerId)
-    
-    // Find next player who hasn't passed
-    let nextIndex = getNextPlayerIndex(currentIndex, this.state.playerCount)
-    let checked = 0
-    
-    while (checked < this.state.playerCount) {
-      const nextPlayer = this.state.players[nextIndex]
-      
-      // Skip the current bidder (they won the bid)
-      if (nextPlayer.id === this.state.bidState.bidderId) {
-        nextIndex = getNextPlayerIndex(nextIndex, this.state.playerCount)
-        checked++
-        continue
-      }
-      
-      if (!this.state.bidState.passed.has(nextPlayer.id)) {
-        this.state.currentPlayerId = nextPlayer.id
-        return
-      }
-      
-      nextIndex = getNextPlayerIndex(nextIndex, this.state.playerCount)
-      checked++
+    // Check if all players have passed
+    const allPassed = this.state.players.every(p => this.state.bidState.passed.has(p.id))
+    if (allPassed) {
+      // End immediately - delete the alarm
+      await this.room.storage.deleteAlarm()
+      this.onCallTimerExpired()
     }
-
-    // All others passed, bidding is over
-    this.endBidding()
   }
 
   endBidding() {
@@ -304,8 +327,10 @@ export default class ThuneeServer implements Party.Server {
     this.state.trump = suit
     this.state.isLastCardTrump = lastCard ?? false
     
-    // Trump caller leads first trick
-    this.state.currentPlayerId = playerId
+    // Person to the right of trumper leads first trick
+    const trumperIndex = this.state.players.findIndex(p => p.id === playerId)
+    const leaderIndex = (trumperIndex + this.state.playerCount - 1) % this.state.playerCount
+    this.state.currentPlayerId = this.state.players[leaderIndex].id
     this.state.phase = "playing"
   }
 
@@ -315,7 +340,11 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.thuneeCallerId = playerId
     this.state.trump = null // No trump in Thunee
-    this.state.currentPlayerId = playerId
+    
+    // Person to the right of thunee caller leads first trick
+    const callerIndex = this.state.players.findIndex(p => p.id === playerId)
+    const leaderIndex = (callerIndex + this.state.playerCount - 1) % this.state.playerCount
+    this.state.currentPlayerId = this.state.players[leaderIndex].id
     this.state.phase = "playing"
   }
 

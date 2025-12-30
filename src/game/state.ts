@@ -38,6 +38,7 @@ export function createEmptyBidState(): BidState {
     currentBid: 0,
     bidderId: null,
     passed: new Set(),
+    timerEndsAt: null,
   }
 }
 

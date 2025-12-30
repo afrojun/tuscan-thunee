@@ -5,6 +5,7 @@ import { ScoreBoard } from './ScoreBoard'
 import { BiddingPanel } from './BiddingPanel'
 import { TrumpSelector } from './TrumpSelector'
 import { CardBack } from './Card'
+import { GameHeader } from './GameHeader'
 
 interface GameBoardProps {
   gameState: GameState
@@ -55,15 +56,19 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
   const rightPlayer = gameState.playerCount === 4 ? getOpponent(1) : null
 
   return (
-    <div className="flex flex-col h-[100dvh] p-2 gap-2 overflow-hidden">
-      {/* Spectator banner */}
-      {isSpectator && (
-        <div className="bg-retro-black/80 text-retro-gold text-center py-1 font-retro text-xs">
-          👁️ SPECTATING
-        </div>
-      )}
+    <div className="flex flex-col h-[100dvh] overflow-hidden">
+      {/* Game header */}
+      <GameHeader gameId={gameState.id} />
 
-      {/* Score board */}
+      <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
+        {/* Spectator banner */}
+        {isSpectator && (
+          <div className="bg-retro-black/80 text-retro-gold text-center py-1 font-retro text-xs">
+            👁️ SPECTATING
+          </div>
+        )}
+
+        {/* Score board */}
       <ScoreBoard 
         teams={gameState.teams}
         players={gameState.players}
@@ -107,8 +112,8 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           {gameState.phase === 'bidding' && (
             <BiddingPanel
               bidState={gameState.bidState}
-              isCurrentPlayer={isCurrentPlayer}
-              currentBidderName={gameState.players.find(p => p.id === gameState.currentPlayerId)?.name ?? ''}
+              currentCallerName={gameState.players.find(p => p.id === gameState.bidState.bidderId)?.name ?? null}
+              hasPassed={gameState.bidState.passed.has(playerId)}
               onBid={handleBid}
               onPass={handlePass}
             />
@@ -207,13 +212,14 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         </div>
       )}
 
-      {/* Thunee indicator */}
-      {gameState.thuneeCallerId && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
-                        font-retro text-4xl text-retro-gold animate-pulse pointer-events-none">
-          THUNEE!
-        </div>
-      )}
+        {/* Thunee indicator */}
+        {gameState.thuneeCallerId && (
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                          font-retro text-4xl text-retro-gold animate-pulse pointer-events-none">
+            THUNEE!
+          </div>
+        )}
+      </div>
     </div>
   )
 }

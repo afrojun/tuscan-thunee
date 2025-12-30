@@ -44,7 +44,7 @@ export function ScoreBoard({ teams, players, currentBid }: ScoreBoardProps) {
 
       {currentBid > 0 && (
         <div className="mt-2 pt-2 border-t border-retro-black/30 text-center font-mono text-sm sm:text-base text-gray-600">
-          Current bid: <span className="font-bold">{currentBid}</span>
+          Current call: <span className="font-bold">{currentBid}</span>
         </div>
       )}
     </div>
