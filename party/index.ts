@@ -5,7 +5,9 @@ import type {
   ServerMessage, 
   Card, 
   Suit,
-  Player 
+  Player,
+  GameEvent,
+  Trick
 } from "../src/game/types"
 import { 
   createInitialState, 
@@ -35,6 +37,12 @@ interface ConnectionState {
 }
 
 const CALL_TIMER_MS = 10000 // 10 seconds
+
+function getTrickEvents(eventLog: GameEvent[]): (Trick & { winnerId: string })[] {
+  return eventLog
+    .filter((e): e is Extract<GameEvent, { type: 'trick' }> => e.type === 'trick')
+    .map(e => e.data)
+}
 
 export default class ThuneeServer implements Party.Server {
   state: GameState
@@ -208,7 +216,7 @@ export default class ThuneeServer implements Party.Server {
     this.state.lastTrickWinningTeam = null
     this.state.currentTrick = createEmptyTrick()
     this.state.tricksPlayed = 0
-    // Don't reset trickHistory - persist across rounds
+    // Don't reset eventLog - persist across rounds
     this.state.challengeResult = null
 
     // Reset hands
@@ -514,10 +522,12 @@ export default class ThuneeServer implements Party.Server {
       reason: wonByTrump ? 'trump' : 'highest'
     }
 
-    // Save trick to history with round number
-    this.state.trickHistory.push({ 
-      ...this.state.currentTrick,
-      roundNumber: this.state.gameRound
+    // Save trick to event log
+    this.state.eventLog.push({
+      type: 'trick',
+      data: { ...this.state.currentTrick, winnerId },
+      roundNumber: this.state.gameRound,
+      timestamp: Date.now()
     })
 
     this.state.tricksPlayed++
@@ -540,8 +550,10 @@ export default class ThuneeServer implements Party.Server {
   }
 
   endRound() {
+    const trickEvents = getTrickEvents(this.state.eventLog)
+    
     // Award 10 points for last trick
-    const lastTrick = this.state.trickHistory[this.state.trickHistory.length - 1]
+    const lastTrick = trickEvents[trickEvents.length - 1]
     if (lastTrick?.winnerId) {
       const lastWinner = this.state.players.find(p => p.id === lastTrick.winnerId)
       if (lastWinner) {
@@ -554,7 +566,7 @@ export default class ThuneeServer implements Party.Server {
       const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
       const thuneeTeam = thuneePlayer.team
       
-      const wonAllTricks = this.state.trickHistory.every(t => {
+      const wonAllTricks = trickEvents.every(t => {
         const winner = this.state.players.find(p => p.id === t.winnerId)
         return winner?.team === thuneeTeam
       })
@@ -606,7 +618,7 @@ export default class ThuneeServer implements Party.Server {
       const thuneeTeam = thuneePlayer.team
       
       // For 2-player Round 2, check all 12 tricks
-      const wonAllTricks = this.state.trickHistory.every(t => {
+      const wonAllTricks = trickEvents.every(t => {
         const winner = this.state.players.find(p => p.id === t.winnerId)
         return winner?.team === thuneeTeam
       })
@@ -653,10 +665,11 @@ export default class ThuneeServer implements Party.Server {
     this.state.phase = "playing"
     this.state.currentTrick = createEmptyTrick()
     this.state.tricksPlayed = 0
-    // Don't reset trickHistory - need full history for cumulative scoring
+    // Don't reset eventLog - need full history for cumulative scoring
     
     // Winner of last trick from Round 1 leads
-    const lastTrick = this.state.trickHistory[this.state.trickHistory.length - 1]
+    const trickEvents = getTrickEvents(this.state.eventLog)
+    const lastTrick = trickEvents[trickEvents.length - 1]
     if (lastTrick?.winnerId) {
       this.state.currentPlayerId = lastTrick.winnerId
     } else {
@@ -694,10 +707,11 @@ export default class ThuneeServer implements Party.Server {
     const handBefore = [...accused.hand, card]
     
     // Get the relevant trick - if currentTrick is empty (trick just completed),
-    // use the last trick from history
+    // use the last trick from event log
+    const trickEvents = getTrickEvents(this.state.eventLog)
     const relevantTrick = this.state.currentTrick.cards.length > 0 
       ? this.state.currentTrick 
-      : this.state.trickHistory[this.state.trickHistory.length - 1]
+      : trickEvents[trickEvents.length - 1]
     
     if (!relevantTrick) return // Safety check
     
@@ -730,6 +744,20 @@ export default class ThuneeServer implements Party.Server {
       wasValid: validation.valid,
       winningTeam
     }
+    
+    // Add to event log
+    this.state.eventLog.push({
+      type: 'challenge',
+      data: {
+        challengerId,
+        accusedId: accused.id,
+        card,
+        wasValid: validation.valid,
+        winningTeam
+      },
+      roundNumber: this.state.gameRound,
+      timestamp: Date.now()
+    })
 
     // Award 4 balls to winning team
     this.state.teams[winningTeam].balls += 4

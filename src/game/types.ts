@@ -41,6 +41,18 @@ export interface TrickResult {
   reason: 'trump' | 'highest'  // Won by trump or highest in lead suit
 }
 
+// Unified event log types
+// To add a new event type:
+// 1. Add a new variant to GameEvent union below
+// 2. Push the event in party/index.ts where the action occurs
+// 3. Add rendering logic in ScoreBoard.tsx inside the eventLog.map()
+export type GameEvent =
+  | { type: 'trick'; data: Trick & { winnerId: string }; roundNumber: number; timestamp: number }
+  | { type: 'challenge'; data: { challengerId: string; accusedId: string; card: Card; wasValid: boolean; winningTeam: 0 | 1 }; roundNumber: number; timestamp: number }
+  | { type: 'thunee-call'; data: { playerId: string }; roundNumber: number; timestamp: number }
+  | { type: 'jodhi-call'; data: { playerId: string; suit: Suit; points: number; hasJack: boolean }; roundNumber: number; timestamp: number }
+  | { type: 'round-start'; data: { dealerId: string }; roundNumber: number; timestamp: number }
+
 export interface TeamScore {
   balls: number
   cardPoints: number
@@ -117,8 +129,8 @@ export interface GameState {
     winningTeam: 0 | 1
   } | null
   
-  // History for disputes
-  trickHistory: Trick[]
+  // Unified event log
+  eventLog: GameEvent[]
   
   // Deck for 2-player mode (need to persist across rounds)
   deck: Card[]

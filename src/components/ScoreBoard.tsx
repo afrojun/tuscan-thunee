@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TeamScore, Player, GamePhase, Suit, Trick, Card } from '@/game/types'
+import type { TeamScore, Player, GamePhase, Suit, Card, GameEvent } from '@/game/types'
 import { CARD_VALUES } from '@/game/types'
 
 interface JodhiCall {
@@ -17,7 +17,7 @@ interface ScoreBoardProps {
   dealRound?: number
   phase?: GamePhase
   jodhiCalls?: JodhiCall[]
-  trickHistory?: Trick[]
+  eventLog?: GameEvent[]
   trump?: Suit | null
 }
 
@@ -35,10 +35,6 @@ const SUIT_COLORS: Record<Suit, string> = {
   spades: 'text-retro-black',
 }
 
-function getTrickPoints(trick: Trick): number {
-  return trick.cards.reduce((sum, play) => sum + CARD_VALUES[play.card.rank], 0)
-}
-
 function formatCard(card: Card): string {
   return `${card.rank}${SUIT_SYMBOLS[card.suit]}`
 }
@@ -51,7 +47,7 @@ export function ScoreBoard({
   dealRound, 
   phase, 
   jodhiCalls = [],
-  trickHistory = [],
+  eventLog = [],
   trump
 }: ScoreBoardProps) {
   const [showHistory, setShowHistory] = useState(false)
@@ -70,21 +66,25 @@ export function ScoreBoard({
   const team0Jodhis = getTeamJodhis(0)
   const team1Jodhis = getTeamJodhis(1)
 
-  const getWinnerName = (winnerId: string | null) => {
-    if (!winnerId) return '?'
-    return players.find(p => p.id === winnerId)?.name ?? '?'
+  const getPlayerName = (playerId: string) => {
+    return players.find(p => p.id === playerId)?.name ?? '?'
   }
 
-  const getWinningCard = (trick: Trick) => {
-    if (!trick.winnerId) return null
+  type TrickEventData = Extract<GameEvent, { type: 'trick' }>['data']
+  
+  const getWinningCard = (trick: TrickEventData) => {
     return trick.cards.find(c => c.playerId === trick.winnerId)?.card
   }
 
-  const getWinReason = (trick: Trick): string => {
+  const getWinReason = (trick: TrickEventData): string => {
     const winningCard = getWinningCard(trick)
     if (!winningCard) return ''
     if (trump && winningCard.suit === trump) return 'trump'
     return 'high'
+  }
+
+  const getTrickPointsFromData = (trick: TrickEventData): number => {
+    return trick.cards.reduce((sum, play) => sum + CARD_VALUES[play.card.rank], 0)
   }
 
   return (
@@ -153,50 +153,94 @@ export function ScoreBoard({
       {/* History drawer */}
       {showHistory && (
         <div className="card-container mt-1 p-3 max-h-64 overflow-y-auto">
-          <p className="font-retro text-xs text-retro-black mb-2">TRICK HISTORY</p>
-          {trickHistory.length === 0 ? (
-            <p className="font-mono text-xs text-gray-500">No tricks played yet</p>
+          <p className="font-retro text-xs text-retro-black mb-2">GAME LOG</p>
+          {eventLog.length === 0 ? (
+            <p className="font-mono text-xs text-gray-500">No events yet</p>
           ) : (
             <div className="space-y-1">
-              {[...trickHistory].reverse().map((trick, idx, arr) => {
-                const winningCard = getWinningCard(trick)
-                const points = getTrickPoints(trick)
-                const reason = getWinReason(trick)
-                const trickNum = trickHistory.length - idx
-                
-                // Check if this is the first trick of a new round (show divider above)
-                const prevTrick = arr[idx - 1]
-                const showRoundDivider = prevTrick && prevTrick.roundNumber !== trick.roundNumber
+              {[...eventLog].reverse().map((event, idx, arr) => {
+                const prevEvent = arr[idx - 1]
+                const showRoundDivider = prevEvent && prevEvent.roundNumber !== event.roundNumber
                 
                 return (
                   <div key={idx}>
                     {showRoundDivider && (
                       <div className="flex items-center gap-2 my-2">
                         <div className="flex-1 border-t-2 border-retro-gold/50" />
-                        <span className="font-retro text-[10px] text-retro-gold">ROUND {prevTrick.roundNumber}</span>
+                        <span className="font-retro text-[10px] text-retro-gold">ROUND {prevEvent.roundNumber}</span>
                         <div className="flex-1 border-t-2 border-retro-gold/50" />
                       </div>
                     )}
-                    <div className="font-mono text-xs flex items-center gap-2 border-b border-gray-200 pb-1">
-                      <span className="text-gray-400 w-5">#{trickNum}</span>
-                      <span className="text-gray-400">
-                        {trick.cards.map((c, i) => (
-                          <span key={i} className={SUIT_COLORS[c.card.suit]}>
-                            {formatCard(c.card)}{i < trick.cards.length - 1 ? '·' : ''}
-                          </span>
-                        ))}
-                      </span>
-                      <span className="text-gray-400">→</span>
-                      <span className="font-bold text-retro-black truncate">
-                        {getWinnerName(trick.winnerId)}
-                      </span>
-                      {winningCard && (
-                        <span className={SUIT_COLORS[winningCard.suit]}>
-                          {formatCard(winningCard)}{reason === 'trump' && '🎺'}
+                    
+                    {event.type === 'challenge' && (
+                      <div className={`font-mono text-xs flex items-center gap-2 py-1 px-2 mb-1 rounded ${
+                        event.data.wasValid ? 'bg-retro-gold/20' : 'bg-retro-red/20'
+                      }`}>
+                        <span>⚡</span>
+                        <span className="font-bold">
+                          {getPlayerName(event.data.challengerId)}
                         </span>
-                      )}
-                      <span className="text-gray-600 ml-auto">+{points}</span>
-                    </div>
+                        <span>challenged</span>
+                        <span className={SUIT_COLORS[event.data.card.suit]}>
+                          {formatCard(event.data.card)}
+                        </span>
+                        <span className="ml-auto font-bold">
+                          {event.data.wasValid ? 'BAD CALL' : 'CAUGHT!'} +4
+                        </span>
+                      </div>
+                    )}
+                    
+                    {event.type === 'trick' && (() => {
+                      const trick = event.data
+                      const trickEvents = eventLog.filter(e => e.type === 'trick')
+                      const trickNum = trickEvents.length - trickEvents.slice().reverse().findIndex(e => e === event)
+                      const winningCard = getWinningCard(trick)
+                      const points = getTrickPointsFromData(trick)
+                      const reason = getWinReason(trick)
+                      
+                      return (
+                        <div className="font-mono text-xs flex items-center gap-2 border-b border-gray-200 pb-1">
+                          <span className="text-gray-400 w-5">#{trickNum}</span>
+                          <span className="text-gray-400">
+                            {trick.cards.map((c, i) => (
+                              <span key={i} className={SUIT_COLORS[c.card.suit]}>
+                                {formatCard(c.card)}{i < trick.cards.length - 1 ? '·' : ''}
+                              </span>
+                            ))}
+                          </span>
+                          <span className="text-gray-400">→</span>
+                          <span className="font-bold text-retro-black truncate">
+                            {getPlayerName(trick.winnerId)}
+                          </span>
+                          {winningCard && (
+                            <span className={SUIT_COLORS[winningCard.suit]}>
+                              {formatCard(winningCard)}{reason === 'trump' && '🎺'}
+                            </span>
+                          )}
+                          <span className="text-gray-600 ml-auto">+{points}</span>
+                        </div>
+                      )
+                    })()}
+                    
+                    {event.type === 'thunee-call' && (
+                      <div className="font-mono text-xs flex items-center gap-2 py-1 px-2 mb-1 rounded bg-retro-gold/30">
+                        <span>🎯</span>
+                        <span className="font-bold">{getPlayerName(event.data.playerId)}</span>
+                        <span>called THUNEE!</span>
+                      </div>
+                    )}
+                    
+                    {event.type === 'jodhi-call' && (
+                      <div className="font-mono text-xs flex items-center gap-2 py-1 px-2 mb-1 rounded bg-purple-200">
+                        <span>👑</span>
+                        <span className="font-bold">{getPlayerName(event.data.playerId)}</span>
+                        <span>Jodhi</span>
+                        <span className={SUIT_COLORS[event.data.suit]}>
+                          {SUIT_SYMBOLS[event.data.suit]}
+                        </span>
+                        <span className="ml-auto">+{event.data.points}</span>
+                      </div>
+                    )}
                   </div>
                 )
               })}

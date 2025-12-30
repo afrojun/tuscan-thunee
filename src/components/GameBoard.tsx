@@ -115,7 +115,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         dealRound={gameState.dealRound}
         phase={gameState.phase}
         jodhiCalls={gameState.jodhiCalls}
-        trickHistory={gameState.trickHistory}
+        eventLog={gameState.eventLog}
         trump={gameState.trump}
       />
 

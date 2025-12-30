@@ -34,7 +34,7 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     challengeWindow: false,
     challengeResult: null,
     
-    trickHistory: [],
+    eventLog: [],
     deck: [],
   }
 }
