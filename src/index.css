@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-felt text-retro-cream font-mono antialiased;
+  }
+}
+
+@layer components {
+  .btn-retro {
+    @apply px-4 py-2 bg-retro-gold text-retro-black font-retro text-xs
+           border-2 border-retro-black shadow-retro
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-retro-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
+           transition-all duration-75;
+  }
+
+  .btn-danger {
+    @apply btn-retro bg-retro-red text-retro-cream;
+  }
+
+  .card-container {
+    @apply bg-card border-2 border-card-border rounded shadow-retro;
+  }
+}
