@@ -10,6 +10,7 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     
     dealerId: null,
     dealRound: 1,
+    gameRound: 1,
     
     bidState: createEmptyBidState(),
     

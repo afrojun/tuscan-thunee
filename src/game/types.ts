@@ -30,6 +30,7 @@ export interface Trick {
   cards: { playerId: string; card: Card }[]
   leadSuit: Suit | null
   winnerId: string | null
+  roundNumber?: number  // Which round this trick was played in
 }
 
 export interface TrickResult {
@@ -75,6 +76,7 @@ export interface GameState {
   // Dealing
   dealerId: string | null
   dealRound: number // For 2-player mode (1 or 2)
+  gameRound: number // Overall round counter (for history)
   
   // Bidding
   bidState: BidState

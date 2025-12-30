@@ -208,7 +208,7 @@ export default class ThuneeServer implements Party.Server {
     this.state.lastTrickWinningTeam = null
     this.state.currentTrick = createEmptyTrick()
     this.state.tricksPlayed = 0
-    this.state.trickHistory = []
+    // Don't reset trickHistory - persist across rounds
     this.state.challengeResult = null
 
     // Reset hands
@@ -514,8 +514,11 @@ export default class ThuneeServer implements Party.Server {
       reason: wonByTrump ? 'trump' : 'highest'
     }
 
-    // Save trick to history
-    this.state.trickHistory.push({ ...this.state.currentTrick })
+    // Save trick to history with round number
+    this.state.trickHistory.push({ 
+      ...this.state.currentTrick,
+      roundNumber: this.state.gameRound
+    })
 
     this.state.tricksPlayed++
     // Keep challengeWindow open so last card can be challenged
@@ -671,6 +674,7 @@ export default class ThuneeServer implements Party.Server {
     this.state.teams[0].cardPoints = 0
     this.state.teams[1].cardPoints = 0
     this.state.dealRound = 1
+    this.state.gameRound++  // Increment overall round counter
     this.state.phase = "waiting"
   }
 
@@ -689,18 +693,26 @@ export default class ThuneeServer implements Party.Server {
     // Reconstruct the hand before the play
     const handBefore = [...accused.hand, card]
     
+    // Get the relevant trick - if currentTrick is empty (trick just completed),
+    // use the last trick from history
+    const relevantTrick = this.state.currentTrick.cards.length > 0 
+      ? this.state.currentTrick 
+      : this.state.trickHistory[this.state.trickHistory.length - 1]
+    
+    if (!relevantTrick) return // Safety check
+    
     // Build trick state before the challenged card was played
-    const cardsBeforePlay = this.state.currentTrick.cards.filter(c => c.playerId !== accused.id)
+    const cardsBeforePlay = relevantTrick.cards.filter(c => c.playerId !== accused.id)
     
     // Check if accused led the trick (was first to play)
-    const accusedLedTrick = this.state.currentTrick.cards.length > 0 && 
-                            this.state.currentTrick.cards[0].playerId === accused.id
+    const accusedLedTrick = relevantTrick.cards.length > 0 && 
+                            relevantTrick.cards[0].playerId === accused.id
     
     const trickBefore: Trick = {
       cards: cardsBeforePlay,
       // If accused led, leadSuit should be null (they can play anything)
       // Otherwise, preserve the original lead suit
-      leadSuit: accusedLedTrick ? null : this.state.currentTrick.leadSuit,
+      leadSuit: accusedLedTrick ? null : relevantTrick.leadSuit,
       winnerId: null
     }
 

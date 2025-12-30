@@ -152,38 +152,51 @@ export function ScoreBoard({
 
       {/* History drawer */}
       {showHistory && (
-        <div className="card-container mt-1 p-3 max-h-48 overflow-y-auto">
+        <div className="card-container mt-1 p-3 max-h-64 overflow-y-auto">
           <p className="font-retro text-xs text-retro-black mb-2">TRICK HISTORY</p>
           {trickHistory.length === 0 ? (
             <p className="font-mono text-xs text-gray-500">No tricks played yet</p>
           ) : (
             <div className="space-y-1">
-              {[...trickHistory].reverse().map((trick, idx) => {
+              {[...trickHistory].reverse().map((trick, idx, arr) => {
                 const winningCard = getWinningCard(trick)
                 const points = getTrickPoints(trick)
                 const reason = getWinReason(trick)
                 const trickNum = trickHistory.length - idx
                 
+                // Check if this is the first trick of a new round (show divider above)
+                const prevTrick = arr[idx - 1]
+                const showRoundDivider = prevTrick && prevTrick.roundNumber !== trick.roundNumber
+                
                 return (
-                  <div key={idx} className="font-mono text-xs flex items-center gap-2 border-b border-gray-200 pb-1">
-                    <span className="text-gray-400 w-5">#{trickNum}</span>
-                    <span className="text-gray-400">
-                      {trick.cards.map((c, i) => (
-                        <span key={i} className={SUIT_COLORS[c.card.suit]}>
-                          {formatCard(c.card)}{i < trick.cards.length - 1 ? '·' : ''}
-                        </span>
-                      ))}
-                    </span>
-                    <span className="text-gray-400">→</span>
-                    <span className="font-bold text-retro-black truncate">
-                      {getWinnerName(trick.winnerId)}
-                    </span>
-                    {winningCard && (
-                      <span className={SUIT_COLORS[winningCard.suit]}>
-                        {formatCard(winningCard)}{reason === 'trump' && '🎺'}
-                      </span>
+                  <div key={idx}>
+                    {showRoundDivider && (
+                      <div className="flex items-center gap-2 my-2">
+                        <div className="flex-1 border-t-2 border-retro-gold/50" />
+                        <span className="font-retro text-[10px] text-retro-gold">ROUND {prevTrick.roundNumber}</span>
+                        <div className="flex-1 border-t-2 border-retro-gold/50" />
+                      </div>
                     )}
-                    <span className="text-gray-600 ml-auto">+{points}</span>
+                    <div className="font-mono text-xs flex items-center gap-2 border-b border-gray-200 pb-1">
+                      <span className="text-gray-400 w-5">#{trickNum}</span>
+                      <span className="text-gray-400">
+                        {trick.cards.map((c, i) => (
+                          <span key={i} className={SUIT_COLORS[c.card.suit]}>
+                            {formatCard(c.card)}{i < trick.cards.length - 1 ? '·' : ''}
+                          </span>
+                        ))}
+                      </span>
+                      <span className="text-gray-400">→</span>
+                      <span className="font-bold text-retro-black truncate">
+                        {getWinnerName(trick.winnerId)}
+                      </span>
+                      {winningCard && (
+                        <span className={SUIT_COLORS[winningCard.suit]}>
+                          {formatCard(winningCard)}{reason === 'trump' && '🎺'}
+                        </span>
+                      )}
+                      <span className="text-gray-600 ml-auto">+{points}</span>
+                    </div>
                   </div>
                 )
               })}
