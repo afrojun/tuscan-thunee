@@ -61,6 +61,8 @@ export interface BidState {
   bidderId: string | null
   passed: Set<string>
   timerEndsAt: number | null // Unix timestamp when timer expires
+  defaultTrumperId: string | null // RHO of dealer - can skip calling
+  preSelectedTrump: Suit | null // Trumper's pre-selection before timer expires
 }
 
 export interface GameState {
@@ -126,6 +128,7 @@ export type ClientMessage =
   | { type: 'start' }
   | { type: 'bid'; amount: number }
   | { type: 'pass' }
+  | { type: 'preselect-trump'; suit: Suit }  // Trumper pre-selects during bidding window
   | { type: 'set-trump'; suit: Suit; lastCard?: boolean }
   | { type: 'call-thunee' }
   | { type: 'call-jodhi'; suit: Suit }

@@ -46,6 +46,10 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
     onAction({ type: 'challenge' })
   }
 
+  const handlePreselectTrump = (suit: Suit) => {
+    onAction({ type: 'preselect-trump', suit })
+  }
+
   const handleCallJodhi = (suit: Suit) => {
     onAction({ type: 'call-jodhi', suit })
   }
@@ -141,10 +145,12 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           {gameState.phase === 'bidding' && (
             <BiddingPanel
               bidState={gameState.bidState}
+              playerId={playerId}
               currentCallerName={gameState.players.find(p => p.id === gameState.bidState.bidderId)?.name ?? null}
               hasPassed={gameState.bidState.passed.has(playerId)}
               onBid={handleBid}
               onPass={handlePass}
+              onPreselectTrump={handlePreselectTrump}
             />
           )}
 

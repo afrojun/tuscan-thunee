@@ -125,6 +125,9 @@ export default class ThuneeServer implements Party.Server {
       case "pass":
         this.handlePass(playerId)
         break
+      case "preselect-trump":
+        this.handlePreselectTrump(playerId, msg.suit)
+        break
       case "set-trump":
         this.handleSetTrump(playerId, msg.suit, msg.lastCard)
         break
@@ -229,7 +232,13 @@ export default class ThuneeServer implements Party.Server {
       }
     }
 
+    // Set default trumper (RHO of dealer)
+    const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
+    const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
+    this.state.bidState.defaultTrumperId = this.state.players[rhoIndex].id
+    
     // Move to calling phase with timer
+    // Others have 10s to call, otherwise default trumper's selection is used
     this.state.phase = "bidding"
     this.state.currentPlayerId = null // Anyone can call
     this.startCallTimer()
@@ -258,19 +267,32 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.bidState.timerEndsAt = null
 
-    // Check if everyone passed or no one called
-    const allPassed = this.state.players.every(p => this.state.bidState.passed.has(p.id))
     const noCalls = this.state.bidState.currentBid === 0
 
-    if (allPassed || noCalls) {
-      // Default: dealer's RHO sets trump
-      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-      const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
-      this.state.trumpCallerId = this.state.players[rhoIndex].id
-      this.state.bidState.bidderId = null // No bid was made
+    if (noCalls) {
+      // No one called - default trumper sets trump
+      this.state.trumpCallerId = this.state.bidState.defaultTrumperId
+      this.state.bidState.bidderId = null
+      
+      // If trumper pre-selected, use that trump directly
+      if (this.state.bidState.preSelectedTrump) {
+        this.state.trump = this.state.bidState.preSelectedTrump
+        this.endBidding()
+        // Skip calling phase, go straight to playing
+        const trumperIndex = this.state.players.findIndex(p => p.id === this.state.trumpCallerId)
+        const leaderIndex = (trumperIndex + this.state.playerCount - 1) % this.state.playerCount
+        this.state.currentPlayerId = this.state.players[leaderIndex].id
+        this.state.phase = "playing"
+      } else {
+        // Trumper didn't preselect - go to calling phase for them to choose
+        this.endBidding()
+      }
+    } else {
+      // Someone called and timer expired - highest bidder wins
+      this.state.trumpCallerId = this.state.bidState.bidderId
+      this.endBidding()
     }
     
-    this.endBidding()
     this.saveState()
     this.broadcastState()
   }
@@ -288,26 +310,42 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.bidState.currentBid = amount
     this.state.bidState.bidderId = playerId
+    
+    // Clear any pre-selected trump - bidding war invalidates it
+    this.state.bidState.preSelectedTrump = null
 
-    // Reset timer for others to counter-call
+    // Start/reset timer for others to counter-call
     this.startCallTimer()
   }
 
   async handlePass(playerId: string) {
     if (this.state.phase !== "bidding") return
+    // Only relevant if timer is running (someone called)
+    if (!this.state.bidState.timerEndsAt) return
     
     // Can't pass twice
     if (this.state.bidState.passed.has(playerId)) return
 
     this.state.bidState.passed.add(playerId)
 
-    // Check if all players have passed
-    const allPassed = this.state.players.every(p => this.state.bidState.passed.has(p.id))
-    if (allPassed) {
+    // Check if all OTHER players have passed (bidder doesn't need to pass)
+    const otherPlayers = this.state.players.filter(p => p.id !== this.state.bidState.bidderId)
+    const allOthersPassed = otherPlayers.every(p => this.state.bidState.passed.has(p.id))
+    if (allOthersPassed) {
       // End immediately - delete the alarm
       await this.room.storage.deleteAlarm()
       this.onCallTimerExpired()
     }
+  }
+
+  handlePreselectTrump(playerId: string, suit: Suit) {
+    if (this.state.phase !== "bidding") return
+    // Only default trumper can preselect
+    if (playerId !== this.state.bidState.defaultTrumperId) return
+    // Can't preselect if someone has already called
+    if (this.state.bidState.currentBid > 0) return
+    
+    this.state.bidState.preSelectedTrump = suit
   }
 
   endBidding() {
