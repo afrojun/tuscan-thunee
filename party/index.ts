@@ -191,7 +191,7 @@ export default class ThuneeServer implements Party.Server {
 
   handleStart() {
     if (this.state.players.length !== this.state.playerCount) return
-    if (this.state.phase !== "waiting") return
+    if (this.state.phase !== "waiting" && this.state.phase !== "round-end") return
 
     this.startDeal()
   }
@@ -687,9 +687,18 @@ export default class ThuneeServer implements Party.Server {
     const handBefore = [...accused.hand, card]
     
     // Build trick state before the challenged card was played
-    const trickBefore = {
-      ...this.state.currentTrick,
-      cards: this.state.currentTrick.cards.filter(c => c.playerId !== accused.id)
+    const cardsBeforePlay = this.state.currentTrick.cards.filter(c => c.playerId !== accused.id)
+    
+    // Check if accused led the trick (was first to play)
+    const accusedLedTrick = this.state.currentTrick.cards.length > 0 && 
+                            this.state.currentTrick.cards[0].playerId === accused.id
+    
+    const trickBefore: Trick = {
+      cards: cardsBeforePlay,
+      // If accused led, leadSuit should be null (they can play anything)
+      // Otherwise, preserve the original lead suit
+      leadSuit: accusedLedTrick ? null : this.state.currentTrick.leadSuit,
+      winnerId: null
     }
 
     const validation = isValidPlay(card, handBefore, trickBefore, this.state.trump)

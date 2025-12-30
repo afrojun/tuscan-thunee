@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import type { GameState, ClientMessage, Card as CardType, Suit } from '@/game/types'
 import { PlayerHand } from './PlayerHand'
 import { TrickArea } from './TrickArea'
@@ -17,10 +18,20 @@ interface GameBoardProps {
 }
 
 export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
+  const [dismissedChallengeResult, setDismissedChallengeResult] = useState(false)
   const currentPlayer = gameState.players.find(p => p.id === playerId)
   const isCurrentPlayer = gameState.currentPlayerId === playerId
   const isSpectator = !currentPlayer || currentPlayer.isSpectator
   const playerIndex = gameState.players.findIndex(p => p.id === playerId)
+  
+  // Reset dismissed state when challenge result changes
+  const challengeResultKey = gameState.challengeResult 
+    ? `${gameState.challengeResult.accusedId}-${gameState.challengeResult.card.suit}-${gameState.challengeResult.card.rank}`
+    : null
+  
+  useEffect(() => {
+    setDismissedChallengeResult(false)
+  }, [challengeResultKey])
 
   const handlePlayCard = (card: CardType) => {
     onAction({ type: 'play-card', card })
@@ -278,7 +289,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         )}
 
         {/* Challenge result modal */}
-        {gameState.challengeResult && (
+        {gameState.challengeResult && !dismissedChallengeResult && (
           <ChallengeResultModal
             challengerId={gameState.challengeResult.challengerId}
             accusedId={gameState.challengeResult.accusedId}
@@ -286,7 +297,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             wasValid={gameState.challengeResult.wasValid}
             winningTeam={gameState.challengeResult.winningTeam}
             players={gameState.players}
-            onDismiss={() => {}}
+            onDismiss={() => setDismissedChallengeResult(true)}
           />
         )}
       </div>
