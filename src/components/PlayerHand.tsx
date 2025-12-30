@@ -18,7 +18,7 @@ export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled }: Pla
 
   return (
     <div className="flex justify-center px-4">
-      <div className="relative flex items-end justify-center" style={{ height: '140px' }}>
+      <div className="relative flex items-end justify-center" style={{ height: '160px' }}>
         {cards.map((card, i) => {
           const angle = cardCount === 1 ? 0 : startAngle + (i * angleStep)
           // Cards at edges are slightly lower (arc effect)
@@ -28,18 +28,31 @@ export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled }: Pla
           return (
             <div 
               key={`${card.suit}-${card.rank}`}
-              className="absolute transition-all duration-150 hover:!-translate-y-4 hover:!z-50"
+              className="absolute group"
               style={{ 
                 transform: `translateX(${(i - (cardCount - 1) / 2) * 45}px) translateY(${yOffset}px) rotate(${angle}deg)`,
                 transformOrigin: 'bottom center',
                 zIndex: i,
               }}
             >
-              <Card
-                card={card}
-                onClick={() => onPlayCard(card)}
-                disabled={disabled || !isCurrentPlayer}
+              {/* Invisible hitbox that doesn't move */}
+              <div 
+                className="absolute inset-0 z-10"
+                style={{ 
+                  top: '-20px',
+                  bottom: '-10px',
+                  left: '-5px',
+                  right: '-5px',
+                }}
               />
+              {/* Card that lifts on hover */}
+              <div className="transition-transform duration-150 group-hover:-translate-y-4 group-hover:z-50">
+                <Card
+                  card={card}
+                  onClick={() => onPlayCard(card)}
+                  disabled={disabled || !isCurrentPlayer}
+                />
+              </div>
             </div>
           )
         })}
