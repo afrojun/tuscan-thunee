@@ -489,8 +489,8 @@ export default class ThuneeServer implements Party.Server {
     this.state.lastPlayedCard = { playerId, card }
     this.state.challengeWindow = true
 
-    // Check if trick is complete
-    if (this.state.currentTrick.cards.length === this.state.playerCount) {
+    // Check if trick is complete (use actual player count, not configured playerCount)
+    if (this.state.currentTrick.cards.length === this.state.players.length) {
       this.completeTrick()
     } else {
       // Next player
