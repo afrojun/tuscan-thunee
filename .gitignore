@@ -3,3 +3,5 @@ dist/
 .partykit/
 *.tsbuildinfo
 .DS_Store
+.env*
+.vercel
