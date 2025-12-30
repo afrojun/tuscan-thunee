@@ -112,8 +112,10 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
       <div className="flex flex-col items-center">
         <p className={`font-mono text-xs mb-1 ${
           topPlayer?.id === gameState.currentPlayerId ? 'text-retro-gold' : 'text-retro-cream/60'
-        }`}>
-          {topPlayer?.name} {topPlayer?.id === gameState.currentPlayerId && '◄'}
+        } ${topPlayer && !topPlayer.connected ? 'opacity-50' : ''}`}>
+          {topPlayer?.name}
+          {topPlayer && !topPlayer.connected && ' 📵'}
+          {topPlayer?.id === gameState.currentPlayerId && ' ◄'}
         </p>
         <div className="flex gap-0.5">
           {Array.from({ length: topPlayer?.hand.length ?? 0 }).map((_, i) => (
@@ -129,8 +131,10 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           <div className="flex flex-col items-center shrink-0">
             <p className={`font-mono text-xs mb-1 writing-mode-vertical ${
               leftPlayer.id === gameState.currentPlayerId ? 'text-retro-gold' : 'text-retro-cream/60'
-            }`}>
-              {leftPlayer.name} {leftPlayer.id === gameState.currentPlayerId && '◄'}
+            } ${!leftPlayer.connected ? 'opacity-50' : ''}`}>
+              {leftPlayer.name}
+              {!leftPlayer.connected && ' 📵'}
+              {leftPlayer.id === gameState.currentPlayerId && ' ◄'}
             </p>
             <div className="flex flex-col gap-0.5">
               {Array.from({ length: leftPlayer.hand.length }).map((_, i) => (
@@ -229,8 +233,10 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           <div className="flex flex-col items-center shrink-0">
             <p className={`font-mono text-xs mb-1 ${
               rightPlayer.id === gameState.currentPlayerId ? 'text-retro-gold' : 'text-retro-cream/60'
-            }`}>
-              {rightPlayer.name} {rightPlayer.id === gameState.currentPlayerId && '◄'}
+            } ${!rightPlayer.connected ? 'opacity-50' : ''}`}>
+              {rightPlayer.name}
+              {!rightPlayer.connected && ' 📵'}
+              {rightPlayer.id === gameState.currentPlayerId && ' ◄'}
             </p>
             <div className="flex flex-col gap-0.5">
               {Array.from({ length: rightPlayer.hand.length }).map((_, i) => (

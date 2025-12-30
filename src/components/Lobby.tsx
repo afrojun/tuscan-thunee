@@ -84,6 +84,7 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyPr
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
                 maxLength={12}
+                autoFocus
                 className="w-full px-3 py-2 bg-white text-retro-black font-mono
                            border-2 border-retro-black"
               />
