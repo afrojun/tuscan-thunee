@@ -25,6 +25,7 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     currentTrick: createEmptyTrick(),
     tricksPlayed: 0,
     currentPlayerId: null,
+    lastTrickResult: null,
     
     teams: [createEmptyTeamScore(), createEmptyTeamScore()],
     
@@ -33,6 +34,7 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     challengeResult: null,
     
     trickHistory: [],
+    deck: [],
   }
 }
 

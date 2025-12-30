@@ -8,6 +8,7 @@ import { CardBack } from './Card'
 import { GameHeader } from './GameHeader'
 import { ChallengeResultModal } from './ChallengeResultModal'
 import { JodhiButton } from './JodhiButton'
+import { TrickResultToast } from './TrickResultToast'
 
 interface GameBoardProps {
   gameState: GameState
@@ -99,6 +100,8 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         dealRound={gameState.dealRound}
         phase={gameState.phase}
         jodhiCalls={gameState.jodhiCalls}
+        trickHistory={gameState.trickHistory}
+        trump={gameState.trump}
       />
 
       {/* Top opponent (partner in 4p, opponent in 2p) */}
@@ -248,6 +251,11 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           />
         </div>
       )}
+
+        {/* Trick result toast */}
+        {gameState.lastTrickResult && (
+          <TrickResultToast result={gameState.lastTrickResult} />
+        )}
 
         {/* Thunee indicator */}
         {gameState.thuneeCallerId && (

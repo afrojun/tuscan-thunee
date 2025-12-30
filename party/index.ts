@@ -38,7 +38,6 @@ const CALL_TIMER_MS = 10000 // 10 seconds
 
 export default class ThuneeServer implements Party.Server {
   state: GameState
-  deck: Card[] = []
   connectionPlayerMap: Map<string, string> = new Map() // connectionId -> playerId
 
   constructor(readonly room: Party.Room) {
@@ -195,7 +194,7 @@ export default class ThuneeServer implements Party.Server {
   }
 
   startDeal() {
-    this.deck = shuffleDeck(createDeck())
+    this.state.deck = shuffleDeck(createDeck())
     this.state.phase = "dealing-first"
     this.state.bidState = createEmptyBidState()
     this.state.trump = null
@@ -219,14 +218,14 @@ export default class ThuneeServer implements Party.Server {
       // 4-player: 4 cards each from first 16 cards
       for (let i = 0; i < 4; i++) {
         const start = i * 4
-        this.state.players[i].hand = this.deck.slice(start, start + 4)
+        this.state.players[i].hand = this.state.deck.slice(start, start + 4)
       }
     } else {
       // 2-player: 4 cards each from first 8 cards
       // Player 0: cards 0-3, Player 1: cards 4-7
       for (let i = 0; i < 2; i++) {
         const start = i * 4
-        this.state.players[i].hand = this.deck.slice(start, start + 4)
+        this.state.players[i].hand = this.state.deck.slice(start, start + 4)
       }
     }
 
@@ -317,8 +316,8 @@ export default class ThuneeServer implements Party.Server {
       // 4-player: cards 16-23 (2 per player)
       const startIndex = 16
       for (let i = 0; i < 4; i++) {
-        const card1 = this.deck[startIndex + i * 2]
-        const card2 = this.deck[startIndex + i * 2 + 1]
+        const card1 = this.state.deck[startIndex + i * 2]
+        const card2 = this.state.deck[startIndex + i * 2 + 1]
         if (card1) this.state.players[i].hand.push(card1)
         if (card2) this.state.players[i].hand.push(card2)
       }
@@ -326,8 +325,8 @@ export default class ThuneeServer implements Party.Server {
       // 2-player: cards 8-11 (2 per player)
       // Player 0: cards 8, 9; Player 1: cards 10, 11
       for (let i = 0; i < 2; i++) {
-        const card1 = this.deck[8 + i * 2]
-        const card2 = this.deck[8 + i * 2 + 1]
+        const card1 = this.state.deck[8 + i * 2]
+        const card2 = this.state.deck[8 + i * 2 + 1]
         if (card1) this.state.players[i].hand.push(card1)
         if (card2) this.state.players[i].hand.push(card2)
       }
@@ -420,8 +419,9 @@ export default class ThuneeServer implements Party.Server {
     if (this.state.phase !== "playing") return
     if (this.state.currentPlayerId !== playerId) return
     
-    // Close jodhi window when a card is played
+    // Close jodhi window and clear last trick result when a card is played
     this.state.jodhiWindow = false
+    this.state.lastTrickResult = null
 
     const player = this.state.players.find(p => p.id === playerId)
     if (!player) return
@@ -461,6 +461,19 @@ export default class ThuneeServer implements Party.Server {
     const winner = this.state.players.find(p => p.id === winnerId)!
     const points = getTrickPoints(this.state.currentTrick)
     this.state.teams[winner.team].cardPoints += points
+
+    // Find winning card and determine reason
+    const winningPlay = this.state.currentTrick.cards.find(c => c.playerId === winnerId)!
+    const wonByTrump = this.state.trump && winningPlay.card.suit === this.state.trump
+    
+    // Store trick result for UI display
+    this.state.lastTrickResult = {
+      winnerId,
+      winnerName: winner.name,
+      winningCard: winningPlay.card,
+      points,
+      reason: wonByTrump ? 'trump' : 'highest'
+    }
 
     // Save trick to history
     this.state.trickHistory.push({ ...this.state.currentTrick })
@@ -588,7 +601,7 @@ export default class ThuneeServer implements Party.Server {
     for (let i = 0; i < 2; i++) {
       this.state.players[i].hand = []
       for (let j = 0; j < 6; j++) {
-        this.state.players[i].hand.push(this.deck[12 + i * 6 + j])
+        this.state.players[i].hand.push(this.state.deck[12 + i * 6 + j])
       }
     }
     

@@ -32,6 +32,14 @@ export interface Trick {
   winnerId: string | null
 }
 
+export interface TrickResult {
+  winnerId: string
+  winnerName: string
+  winningCard: Card
+  points: number
+  reason: 'trump' | 'highest'  // Won by trump or highest in lead suit
+}
+
 export interface TeamScore {
   balls: number
   cardPoints: number
@@ -89,6 +97,7 @@ export interface GameState {
   currentTrick: Trick
   tricksPlayed: number
   currentPlayerId: string | null
+  lastTrickResult: TrickResult | null
   
   // Scoring
   teams: [TeamScore, TeamScore]
@@ -106,6 +115,9 @@ export interface GameState {
   
   // History for disputes
   trickHistory: Trick[]
+  
+  // Deck for 2-player mode (need to persist across rounds)
+  deck: Card[]
 }
 
 // Messages from client to server

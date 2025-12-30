@@ -35,9 +35,9 @@ export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled }: Pla
                 zIndex: i,
               }}
             >
-              {/* Invisible hitbox that doesn't move */}
+              {/* Invisible hitbox that doesn't move - pointer-events-none so clicks pass through */}
               <div 
-                className="absolute inset-0 z-10"
+                className="absolute inset-0 z-10 pointer-events-none"
                 style={{ 
                   top: '-20px',
                   bottom: '-10px',
