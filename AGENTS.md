@@ -86,3 +86,29 @@ party/
 # For production deployment
 VITE_PARTYKIT_HOST=your-app.partykit.dev
 ```
+
+## Deployment
+
+### PartyKit Server
+
+```bash
+npx partykit login
+bun run party:deploy
+```
+
+Server URL will be: `tuscan-thunee.USERNAME.partykit.dev`
+
+### Frontend (Vercel recommended)
+
+```bash
+vercel
+```
+
+Set `VITE_PARTYKIT_HOST` in Vercel dashboard → Settings → Environment Variables, then redeploy.
+
+### Other Frontend Hosts
+
+- **Cloudflare Pages**: `bun run build`, upload `dist/`
+- **Netlify**: `bun run build`, drag `dist/` to dashboard
+
+All require setting `VITE_PARTYKIT_HOST` env var to the PartyKit server URL.
