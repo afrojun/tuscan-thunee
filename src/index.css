@@ -103,18 +103,46 @@
     animation: score-pop 0.3s ease-out;
   }
 
+  /* Floating score animation */
+  @keyframes float-up-score {
+    0% {
+      opacity: 0;
+      transform: translateY(0) scale(0.5);
+    }
+    20% {
+      opacity: 1;
+      transform: translateY(-10px) scale(1.2);
+    }
+    80% {
+      opacity: 1;
+      transform: translateY(-40px) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-60px) scale(0.8);
+    }
+  }
+
+  .animate-float-score {
+    animation: float-up-score 1.5s ease-out forwards;
+  }
+
   /* Ball won celebration */
   @keyframes ball-celebrate {
     0% { 
       transform: scale(1);
       text-shadow: none;
     }
-    25% { 
-      transform: scale(1.2);
-      text-shadow: 0 0 10px rgba(212, 168, 71, 0.8);
+    15% { 
+      transform: scale(1.5);
+      text-shadow: 0 0 20px rgba(212, 168, 71, 1), 0 0 40px rgba(212, 168, 71, 0.6);
     }
-    50% { 
-      transform: scale(1.1);
+    30% { 
+      transform: scale(1.2);
+    }
+    50% {
+      transform: scale(1.4);
+      text-shadow: 0 0 30px rgba(212, 168, 71, 1);
     }
     100% { 
       transform: scale(1);
@@ -123,6 +151,62 @@
   }
 
   .animate-ball-celebrate {
-    animation: ball-celebrate 0.5s ease-out;
+    animation: ball-celebrate 1s ease-out;
+  }
+
+  /* Ball burst particles */
+  @keyframes ball-burst {
+    0% {
+      opacity: 1;
+      transform: scale(0) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.5) rotate(180deg);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(2) rotate(360deg);
+    }
+  }
+
+  .animate-ball-burst {
+    animation: ball-burst 0.8s ease-out forwards;
+  }
+
+  /* Card fly animation - used with custom properties */
+  @keyframes card-fly {
+    0% {
+      transform: var(--start-transform);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(0, 0) rotate(0deg) scale(1);
+      opacity: 1;
+    }
+  }
+
+  .animate-card-fly {
+    animation: card-fly 0.3s ease-out forwards;
+  }
+
+  /* Card deal animation with stagger */
+  @keyframes card-deal {
+    0% {
+      opacity: 0;
+      transform: translateY(-100px) rotate(-10deg) scale(0.8);
+    }
+    60% {
+      opacity: 1;
+      transform: translateY(5px) rotate(2deg) scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) rotate(0deg) scale(1);
+    }
+  }
+
+  .animate-card-deal {
+    animation: card-deal 0.4s ease-out forwards;
   }
 }

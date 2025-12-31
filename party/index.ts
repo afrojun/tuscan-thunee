@@ -225,6 +225,7 @@ export default class ThuneeServer implements Party.Server {
     this.state.tricksPlayed = 0
     // Don't reset eventLog - persist across rounds
     this.state.challengeResult = null
+    this.state.lastBallAward = null
 
     // Reset hands
     for (const player of this.state.players) {
@@ -593,9 +594,11 @@ export default class ThuneeServer implements Party.Server {
 
       if (wonAllTricks) {
         this.state.teams[thuneeTeam].balls += 4
+        this.state.lastBallAward = { team: thuneeTeam, amount: 4, reason: 'thunee' }
       } else {
         const otherTeam = thuneeTeam === 0 ? 1 : 0
         this.state.teams[otherTeam].balls += 4
+        this.state.lastBallAward = { team: otherTeam, amount: 4, reason: 'thunee' }
       }
 
       if (this.checkGameOver()) return
@@ -645,16 +648,20 @@ export default class ThuneeServer implements Party.Server {
 
       if (wonAllTricks) {
         this.state.teams[thuneeTeam].balls += 4
+        this.state.lastBallAward = { team: thuneeTeam, amount: 4, reason: 'thunee' }
       } else {
         const otherTeam = thuneeTeam === 0 ? 1 : 0
         this.state.teams[otherTeam].balls += 4
+        this.state.lastBallAward = { team: otherTeam, amount: 4, reason: 'thunee' }
       }
     } else {
       // Normal scoring
       if (countingScore >= target) {
         this.state.teams[countingTeam].balls += 1
+        this.state.lastBallAward = { team: countingTeam, amount: 1, reason: 'normal' }
       } else {
         this.state.teams[trumpTeam].balls += 1
+        this.state.lastBallAward = { team: trumpTeam, amount: 1, reason: 'normal' }
       }
     }
 

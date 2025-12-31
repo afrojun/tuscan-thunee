@@ -135,6 +135,13 @@ export interface GameState {
   
   // Deck for 2-player mode (need to persist across rounds)
   deck: Card[]
+  
+  // Ball award tracking for celebration animation
+  lastBallAward: {
+    team: 0 | 1
+    amount: number
+    reason: 'normal' | 'thunee'
+  } | null
 }
 
 // Messages from client to server

@@ -6,9 +6,10 @@ interface PlayerHandProps {
   onPlayCard: (card: CardType) => void
   isCurrentPlayer: boolean
   disabled?: boolean
+  dealing?: boolean
 }
 
-export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled }: PlayerHandProps) {
+export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled, dealing = false }: PlayerHandProps) {
   const cardCount = cards.length
   
   // Calculate fan angles - spread cards across ~60 degrees total
@@ -28,11 +29,12 @@ export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled }: Pla
           return (
             <div 
               key={`${card.suit}-${card.rank}`}
-              className="absolute group"
+              className={`absolute group ${dealing ? 'animate-card-deal' : ''}`}
               style={{ 
                 transform: `translateX(${(i - (cardCount - 1) / 2) * 45}px) translateY(${yOffset}px) rotate(${angle}deg)`,
                 transformOrigin: 'bottom center',
                 zIndex: i,
+                animationDelay: dealing ? `${i * 0.1}s` : undefined,
               }}
             >
               {/* Invisible hitbox that doesn't move - pointer-events-none so clicks pass through */}

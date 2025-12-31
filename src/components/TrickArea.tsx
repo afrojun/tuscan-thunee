@@ -1,5 +1,7 @@
 import { Card } from './Card'
+import { FloatingScore } from './FloatingScore'
 import type { Trick, Player } from '@/game/types'
+import { CARD_VALUES } from '@/game/types'
 
 interface TrickAreaProps {
   trick: Trick
@@ -28,6 +30,27 @@ export function TrickArea({ trick, players, showingResult = false }: TrickAreaPr
     }
   }
 
+  // Get animation start position based on which player played the card
+  const getCardFlyOrigin = (playerIndex: number, totalPlayers: number) => {
+    if (totalPlayers === 4) {
+      const origins = [
+        'translateY(120px) scale(0.8)',     // bottom (me) - comes from below
+        'translateX(100px) scale(0.8)',     // right - comes from right
+        'translateY(-120px) scale(0.8)',    // top (partner) - comes from above
+        'translateX(-100px) scale(0.8)',    // left - comes from left
+      ]
+      return origins[playerIndex]
+    } else {
+      const origins = [
+        'translateY(120px) scale(0.8)',     // bottom (me) - comes from below
+        'translateY(-120px) scale(0.8)',    // top (opponent) - comes from above
+      ]
+      return origins[playerIndex]
+    }
+  }
+
+  const trickPoints = trick.cards.reduce((sum, play) => sum + CARD_VALUES[play.card.rank], 0)
+
   return (
     <div className="relative w-64 h-64 sm:w-80 sm:h-80 mx-auto">
       {/* Played cards */}
@@ -36,16 +59,23 @@ export function TrickArea({ trick, players, showingResult = false }: TrickAreaPr
         const position = getPosition(playerIndex, players.length)
         const isWinner = showingResult && trick.winnerId === playerId
         const isLatestCard = !showingResult && index === trick.cards.length - 1
+        const flyOrigin = getCardFlyOrigin(playerIndex, players.length)
         
         return (
           <div
             key={`${playerId}-${card.suit}-${card.rank}`}
-            className={`absolute ${position} ${isLatestCard ? 'animate-card-enter' : ''} ${isWinner ? 'animate-winner-glow rounded-lg' : ''}`}
+            className={`absolute ${position} ${isLatestCard ? 'animate-card-fly' : ''} ${isWinner ? 'animate-winner-glow rounded-lg' : ''}`}
+            style={isLatestCard ? { '--start-transform': flyOrigin } as React.CSSProperties : undefined}
           >
             <Card card={card} disabled />
           </div>
         )
       })}
+      
+      {/* Floating score when trick is complete */}
+      {showingResult && trick.winnerId && (
+        <FloatingScore points={trickPoints} />
+      )}
     </div>
   )
 }

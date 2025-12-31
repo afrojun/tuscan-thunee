@@ -11,6 +11,7 @@ import { ChallengeResultModal } from './ChallengeResultModal'
 import { ChallengeModal } from './ChallengeModal'
 import { JodhiButton } from './JodhiButton'
 import { TrickResultToast } from './TrickResultToast'
+import { BallCelebration } from './BallCelebration'
 
 interface GameBoardProps {
   gameState: GameState
@@ -21,6 +22,10 @@ interface GameBoardProps {
 export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
   const [dismissedChallengeResult, setDismissedChallengeResult] = useState(false)
   const [showChallengeModal, setShowChallengeModal] = useState(false)
+  const [showBallCelebration, setShowBallCelebration] = useState(false)
+  const [celebrationData, setCelebrationData] = useState<{ teamName: string; amount: number } | null>(null)
+  const [isDealing, setIsDealing] = useState(false)
+  const [prevPhase, setPrevPhase] = useState(gameState.phase)
   const currentPlayer = gameState.players.find(p => p.id === playerId)
   const isCurrentPlayer = gameState.currentPlayerId === playerId
   const isSpectator = !currentPlayer || currentPlayer.isSpectator
@@ -35,6 +40,31 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
     setDismissedChallengeResult(false)
     setShowChallengeModal(false)
   }, [challengeResultKey])
+
+  // Trigger ball celebration when balls are awarded
+  useEffect(() => {
+    if (gameState.lastBallAward) {
+      const teamPlayers = gameState.players
+        .filter(p => p.team === gameState.lastBallAward!.team)
+        .map(p => p.name)
+        .join(' & ')
+      setCelebrationData({
+        teamName: teamPlayers,
+        amount: gameState.lastBallAward.amount,
+      })
+      setShowBallCelebration(true)
+    }
+  }, [gameState.lastBallAward, gameState.players])
+
+  // Detect dealing - when phase transitions to bidding, trigger deal animation
+  useEffect(() => {
+    if (prevPhase !== 'bidding' && gameState.phase === 'bidding') {
+      setIsDealing(true)
+      const timer = setTimeout(() => setIsDealing(false), 1000)
+      return () => clearTimeout(timer)
+    }
+    setPrevPhase(gameState.phase)
+  }, [gameState.phase, prevPhase])
 
   const handlePlayCard = (card: CardType) => {
     onAction({ type: 'play-card', card })
@@ -264,6 +294,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             onPlayCard={handlePlayCard}
             isCurrentPlayer={isCurrentPlayer && gameState.phase === 'playing'}
             disabled={gameState.phase !== 'playing'}
+            dealing={isDealing}
           />
           
           {/* Action buttons - below cards */}
@@ -323,6 +354,15 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             result={gameState.challengeResult}
             players={gameState.players}
             onDismiss={() => setDismissedChallengeResult(true)}
+          />
+        )}
+
+        {/* Ball celebration overlay */}
+        {showBallCelebration && celebrationData && (
+          <BallCelebration
+            teamName={celebrationData.teamName}
+            ballsWon={celebrationData.amount}
+            onComplete={() => setShowBallCelebration(false)}
           />
         )}
       </div>
