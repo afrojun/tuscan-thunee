@@ -146,7 +146,7 @@ export type ClientMessage =
   | { type: 'preselect-trump'; suit: Suit }  // Trumper pre-selects during bidding window
   | { type: 'set-trump'; suit: Suit; lastCard?: boolean }
   | { type: 'call-thunee' }
-  | { type: 'call-jodhi'; suit: Suit }
+  | { type: 'call-jodhi'; suit: Suit; withJack: boolean }
   | { type: 'call-trumpless' }
   | { type: 'play-card'; card: Card }
   | { type: 'challenge-play'; accusedId: string }

@@ -147,7 +147,7 @@ export default class ThuneeServer implements Party.Server {
         this.handleCallThunee(playerId)
         break
       case "call-jodhi":
-        this.handleCallJodhi(playerId, msg.suit)
+        this.handleCallJodhi(playerId, msg.suit, msg.withJack)
         break
       case "play-card":
         this.handlePlayCard(playerId, msg.card)
@@ -441,8 +441,8 @@ export default class ThuneeServer implements Party.Server {
     this.state.phase = "playing"
   }
 
-  handleCallJodhi(playerId: string, suit: Suit) {
-    if (this.state.phase !== "playing") return
+  handleCallJodhi(playerId: string, suit: Suit, withJack: boolean) {
+    if (this.state.phase !== "playing" && this.state.phase !== "trick-complete") return
     if (!this.state.jodhiWindow) return
 
     // Caller must be on the winning team
@@ -456,28 +456,25 @@ export default class ThuneeServer implements Party.Server {
     )
     if (alreadyCalled) return
 
-    // Check if player has Q+K in the suit (honor system, but validate they have cards)
-    const hasQ = caller.hand.some(c => c.suit === suit && c.rank === 'Q')
-    const hasK = caller.hand.some(c => c.suit === suit && c.rank === 'K')
-    const hasJ = caller.hand.some(c => c.suit === suit && c.rank === 'J')
-
-    // Must have at least Q+K (honor system - we trust the player)
-    if (!hasQ || !hasK) return
-
-    // Calculate points
+    // Calculate points based on claim (not validation - that happens on challenge)
     const isTrump = suit === this.state.trump
-    let points: number
-    if (hasJ) {
-      points = isTrump ? 50 : 30
-    } else {
-      points = isTrump ? 40 : 20
-    }
+    const points = withJack 
+      ? (isTrump ? 50 : 30) 
+      : (isTrump ? 40 : 20)
 
     this.state.jodhiCalls.push({
       playerId,
       points,
       suit,
-      hasJack: hasJ
+      hasJack: withJack  // This is what they CLAIMED, not validated
+    })
+
+    // Log the jodhi call
+    this.state.eventLog.push({
+      type: 'jodhi-call',
+      data: { playerId, suit, points, hasJack: withJack },
+      roundNumber: this.state.gameRound,
+      timestamp: Date.now()
     })
   }
 
@@ -844,11 +841,14 @@ export default class ThuneeServer implements Party.Server {
     const jodhiClaim = this.state.jodhiCalls.find(j => j.playerId === accusedId && j.suit === suit)
     if (!jodhiClaim) return // No such claim
 
-    // Validate: check if Q+K exist in current hand + all cards played this round
+    // Validate: check if Q+K (and J if claimed) exist in current hand + all cards played this round
     const allCards = [...accused.hand, ...this.getPlayerCardsPlayed(accusedId)]
     const hasQ = allCards.some(c => c.suit === suit && c.rank === 'Q')
     const hasK = allCards.some(c => c.suit === suit && c.rank === 'K')
-    const isValid = hasQ && hasK
+    const hasJ = allCards.some(c => c.suit === suit && c.rank === 'J')
+    
+    // Valid if they have Q+K, AND if they claimed J they must have J
+    const isValid = hasQ && hasK && (!jodhiClaim.hasJack || hasJ)
 
     // Determine winning team
     const winningTeam = isValid ? accused.team : challenger.team

@@ -70,8 +70,8 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
     onAction({ type: 'preselect-trump', suit })
   }
 
-  const handleCallJodhi = (suit: Suit) => {
-    onAction({ type: 'call-jodhi', suit })
+  const handleCallJodhi = (suit: Suit, withJack: boolean) => {
+    onAction({ type: 'call-jodhi', suit, withJack })
   }
 
   const canCallJodhi = () => {
@@ -173,7 +173,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         )}
 
         {/* Center area - trick or action panel */}
-        <div className="flex-1 flex items-center justify-center max-w-xs">
+        <div className="flex-1 flex items-center justify-center max-w-sm overflow-y-auto">
           {gameState.phase === 'bidding' && (
             <BiddingPanel
               bidState={gameState.bidState}
@@ -195,7 +195,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           )}
 
           {(gameState.phase === 'playing' || gameState.phase === 'trick-complete') && (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-full overflow-y-auto">
               <TrickArea
                 trick={gameState.currentTrick}
                 players={gameState.players}
@@ -205,6 +205,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
               {/* Jodhi button - only for winning team after trick */}
               {canCallJodhi() && currentPlayer && (
                 <JodhiButton
+                  trump={gameState.trump}
                   calledJodhiSuits={myCalledJodhiSuits}
                   onCallJodhi={handleCallJodhi}
                   disabled={false}

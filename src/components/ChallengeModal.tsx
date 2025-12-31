@@ -56,17 +56,17 @@ export function ChallengeModal({
             No opponents to challenge
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {opponents.map(opponent => {
               const opponentJodhis = getOpponentJodhis(opponent.id)
               
               return (
-                <div key={opponent.id} className="border-b border-gray-200 pb-3 last:border-0">
-                  <p className="font-mono text-sm font-bold text-retro-black mb-2">
+                <div key={opponent.id} className="space-y-2">
+                  <p className="font-mono text-sm font-bold text-retro-black">
                     {opponent.name}
                   </p>
                   
-                  <div className="flex flex-wrap gap-2">
+                  <div className="space-y-2">
                     {/* Challenge their last play */}
                     <button
                       onClick={() => onChallengePlay(opponent.id)}
@@ -75,16 +75,23 @@ export function ChallengeModal({
                       Last Play
                     </button>
                     
-                    {/* Challenge their Jodhi claims */}
-                    {opponentJodhis.map(jodhi => (
-                      <button
-                        key={jodhi.suit}
-                        onClick={() => onChallengeJodhi(opponent.id, jodhi.suit)}
-                        className={`btn-danger text-xs ${SUIT_COLORS[jodhi.suit]}`}
-                      >
-                        Jodhi {SUIT_SYMBOLS[jodhi.suit]}
-                      </button>
-                    ))}
+                    {/* Jodhi challenges - suit buttons */}
+                    {opponentJodhis.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-gray-600">Jodhi:</span>
+                        {opponentJodhis.map(jodhi => (
+                          <button
+                            key={jodhi.suit}
+                            onClick={() => onChallengeJodhi(opponent.id, jodhi.suit)}
+                            className={`px-2 py-1 font-mono text-sm border-2 border-retro-black 
+                              bg-retro-cream hover:bg-retro-red hover:text-white hover:border-retro-red
+                              transition-colors ${SUIT_COLORS[jodhi.suit]}`}
+                          >
+                            <span className="text-lg">{SUIT_SYMBOLS[jodhi.suit]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )
