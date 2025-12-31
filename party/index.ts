@@ -716,12 +716,12 @@ export default class ThuneeServer implements Party.Server {
     const nextDealerIndex = getNextPlayerIndex(dealerIndex, this.state.playerCount)
     this.state.dealerId = this.state.players[nextDealerIndex].id
 
-    // Reset for next deal
+    // Reset for next deal (but keep phase as round-end so players can see summary)
     this.state.teams[0].cardPoints = 0
     this.state.teams[1].cardPoints = 0
     this.state.dealRound = 1
     this.state.gameRound++  // Increment overall round counter
-    this.state.phase = "waiting"
+    // Phase stays as "round-end" - handleStart will set it to dealing
   }
 
   // Get all cards a player has played this round (from event log + current trick)
