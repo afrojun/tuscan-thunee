@@ -30,8 +30,6 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     
     teams: [createEmptyTeamScore(), createEmptyTeamScore()],
     
-    lastPlayedCard: null,
-    challengeWindow: false,
     challengeResult: null,
     
     eventLog: [],

@@ -1,65 +1,62 @@
-import type { Card, Suit } from '@/game/types'
+import { useState } from 'react'
+import type { Suit } from '@/game/types'
 
 interface JodhiButtonProps {
-  hand: Card[]
-  trump: Suit | null
   calledJodhiSuits: Suit[]
   onCallJodhi: (suit: Suit) => void
   disabled: boolean
 }
 
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '♥',
-  diamonds: '♦',
-  clubs: '♣',
-  spades: '♠',
-}
+const SUITS: { suit: Suit; symbol: string; color: string }[] = [
+  { suit: 'hearts', symbol: '♥', color: 'text-red-600' },
+  { suit: 'diamonds', symbol: '♦', color: 'text-red-600' },
+  { suit: 'clubs', symbol: '♣', color: 'text-retro-black' },
+  { suit: 'spades', symbol: '♠', color: 'text-retro-black' },
+]
 
-export function JodhiButton({ hand, trump, calledJodhiSuits, onCallJodhi, disabled }: JodhiButtonProps) {
-  const availableJodhis: { suit: Suit; points: number; hasJack: boolean }[] = []
+export function JodhiButton({ calledJodhiSuits, onCallJodhi, disabled }: JodhiButtonProps) {
+  const [showSuits, setShowSuits] = useState(false)
   
-  const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades']
+  const availableSuits = SUITS.filter(s => !calledJodhiSuits.includes(s.suit))
   
-  for (const suit of suits) {
-    if (calledJodhiSuits.includes(suit)) continue
-    
-    const hasQ = hand.some(c => c.suit === suit && c.rank === 'Q')
-    const hasK = hand.some(c => c.suit === suit && c.rank === 'K')
-    const hasJ = hand.some(c => c.suit === suit && c.rank === 'J')
-    
-    if (hasQ && hasK) {
-      const isTrump = suit === trump
-      let points: number
-      if (hasJ) {
-        points = isTrump ? 50 : 30
-      } else {
-        points = isTrump ? 40 : 20
-      }
-      availableJodhis.push({ suit, points, hasJack: hasJ })
-    }
+  if (availableSuits.length === 0) return null
+  
+  if (!showSuits) {
+    return (
+      <button
+        onClick={() => setShowSuits(true)}
+        disabled={disabled}
+        className="btn-retro text-xs"
+      >
+        👑 JODHI
+      </button>
+    )
   }
-  
-  if (availableJodhis.length === 0) return null
   
   return (
     <div className="card-container p-2 space-y-2">
       <p className="font-retro text-xs text-retro-black text-center">CALL JODHI</p>
-      <div className="flex gap-2 justify-center flex-wrap">
-        {availableJodhis.map(({ suit, points }) => (
+      <div className="flex gap-2 justify-center">
+        {availableSuits.map(({ suit, symbol, color }) => (
           <button
             key={suit}
-            onClick={() => onCallJodhi(suit)}
+            onClick={() => {
+              onCallJodhi(suit)
+              setShowSuits(false)
+            }}
             disabled={disabled}
-            className={`btn-retro text-xs px-3 py-1 ${
-              suit === 'hearts' || suit === 'diamonds' 
-                ? 'text-red-600' 
-                : 'text-black'
-            }`}
+            className={`btn-retro text-lg px-3 py-1 ${color}`}
           >
-            {SUIT_SYMBOLS[suit]} {points}
+            {symbol}
           </button>
         ))}
       </div>
+      <button
+        onClick={() => setShowSuits(false)}
+        className="text-xs text-gray-500 underline w-full"
+      >
+        Cancel
+      </button>
     </div>
   )
 }

@@ -152,8 +152,11 @@ export default class ThuneeServer implements Party.Server {
       case "play-card":
         this.handlePlayCard(playerId, msg.card)
         break
-      case "challenge":
-        this.handleChallenge(playerId)
+      case "challenge-play":
+        this.handleChallengePlay(playerId, msg.accusedId)
+        break
+      case "challenge-jodhi":
+        this.handleChallengeJodhi(playerId, msg.accusedId, msg.suit)
         break
     }
 
@@ -482,9 +485,8 @@ export default class ThuneeServer implements Party.Server {
     if (this.state.phase !== "playing") return
     if (this.state.currentPlayerId !== playerId) return
 
-    // Close previous windows and clear last trick result when a card is played
+    // Close jodhi window and clear last trick result when a card is played
     this.state.jodhiWindow = false
-    this.state.challengeWindow = false  // Close previous challenge window
     this.state.lastTrickResult = null
 
     const player = this.state.players.find(p => p.id === playerId)
@@ -501,10 +503,6 @@ export default class ThuneeServer implements Party.Server {
       this.state.currentTrick.leadSuit = card.suit
     }
     this.state.currentTrick.cards.push({ playerId, card })
-
-    // Track for challenge system
-    this.state.lastPlayedCard = { playerId, card }
-    this.state.challengeWindow = true
 
     // Check if trick is complete (use actual player count, not configured playerCount)
     if (this.state.currentTrick.cards.length === this.state.players.length) {
@@ -548,8 +546,6 @@ export default class ThuneeServer implements Party.Server {
     })
 
     this.state.tricksPlayed++
-    // Keep challengeWindow open so last card can be challenged
-    // It will close when next card is played or round ends
 
     // Open jodhi window for winning team
     this.state.jodhiWindow = true
@@ -563,7 +559,6 @@ export default class ThuneeServer implements Party.Server {
   onTrickDisplayComplete() {
     // Check if round is over (6 tricks for 4 players, 6 per round for 2 players)
     if (this.state.tricksPlayed === 6) {
-      this.state.challengeWindow = false // Close at end of round
       this.endRound()
     } else {
       // Winner leads next trick
@@ -719,42 +714,111 @@ export default class ThuneeServer implements Party.Server {
     this.state.phase = "waiting"
   }
 
-  handleChallenge(challengerId: string) {
-    if (!this.state.challengeWindow) return
-    if (!this.state.lastPlayedCard) return
+  // Get all cards a player has played this round (from event log + current trick)
+  getPlayerCardsPlayed(playerId: string): Card[] {
+    const trickEvents = getTrickEvents(this.state.eventLog)
+    const cardsPlayed: Card[] = []
+    
+    // Cards from completed tricks this round
+    for (const trick of trickEvents) {
+      const play = trick.cards.find(c => c.playerId === playerId)
+      if (play) cardsPlayed.push(play.card)
+    }
+    
+    // Cards from current trick
+    const currentPlay = this.state.currentTrick.cards.find(c => c.playerId === playerId)
+    if (currentPlay) cardsPlayed.push(currentPlay.card)
+    
+    return cardsPlayed
+  }
+
+  // Reconstruct a player's hand at a specific point in time
+  // Returns: current hand + all cards played after the specified trick/card
+  reconstructHandAtPlay(playerId: string, trickIndex: number, cardIndexInTrick: number): Card[] {
+    const accused = this.state.players.find(p => p.id === playerId)
+    if (!accused) return []
+    
+    const trickEvents = getTrickEvents(this.state.eventLog)
+    const hand = [...accused.hand]
+    
+    // Add back cards played after the challenged play
+    // First, cards from tricks after the challenged trick
+    for (let i = trickIndex + 1; i < trickEvents.length; i++) {
+      const play = trickEvents[i].cards.find(c => c.playerId === playerId)
+      if (play) hand.push(play.card)
+    }
+    
+    // Add back cards from current trick (if it's after the challenged trick)
+    if (trickIndex < trickEvents.length) {
+      const currentPlay = this.state.currentTrick.cards.find(c => c.playerId === playerId)
+      if (currentPlay) hand.push(currentPlay.card)
+    } else {
+      // Challenged play is in current trick - add back cards played after it
+      for (let i = cardIndexInTrick + 1; i < this.state.currentTrick.cards.length; i++) {
+        if (this.state.currentTrick.cards[i].playerId === playerId) {
+          hand.push(this.state.currentTrick.cards[i].card)
+        }
+      }
+    }
+    
+    // Add the challenged card itself
+    const challengedTrick = trickIndex < trickEvents.length 
+      ? trickEvents[trickIndex] 
+      : this.state.currentTrick
+    const challengedPlay = challengedTrick.cards.find(c => c.playerId === playerId)
+    if (challengedPlay) hand.push(challengedPlay.card)
+    
+    return hand
+  }
+
+  handleChallengePlay(challengerId: string, accusedId: string) {
+    if (this.state.phase !== "playing" && this.state.phase !== "trick-complete") return
 
     const challenger = this.state.players.find(p => p.id === challengerId)
-    const accused = this.state.players.find(p => p.id === this.state.lastPlayedCard!.playerId)
+    const accused = this.state.players.find(p => p.id === accusedId)
 
     if (!challenger || !accused) return
     if (challenger.team === accused.team) return // Can't challenge teammate
 
-    const card = this.state.lastPlayedCard.card
-
-    // Reconstruct the hand before the play
-    const handBefore = [...accused.hand, card]
-
-    // Get the relevant trick - if currentTrick is empty (trick just completed),
-    // use the last trick from event log
+    // Find the accused's last play - check current trick first, then completed tricks
     const trickEvents = getTrickEvents(this.state.eventLog)
-    const relevantTrick = this.state.currentTrick.cards.length > 0
-      ? this.state.currentTrick
-      : trickEvents[trickEvents.length - 1]
+    let trickIndex = -1
+    let cardIndexInTrick = -1
+    let relevantTrick: Trick | null = null
+    let accusedPlay: { playerId: string; card: Card } | undefined
+    
+    // Check current trick first
+    accusedPlay = this.state.currentTrick.cards.find(c => c.playerId === accusedId)
+    if (accusedPlay) {
+      trickIndex = trickEvents.length // Current trick is "after" all completed tricks
+      cardIndexInTrick = this.state.currentTrick.cards.findIndex(c => c.playerId === accusedId)
+      relevantTrick = this.state.currentTrick
+    } else {
+      // Check completed tricks in reverse order (most recent first)
+      for (let i = trickEvents.length - 1; i >= 0; i--) {
+        accusedPlay = trickEvents[i].cards.find(c => c.playerId === accusedId)
+        if (accusedPlay) {
+          trickIndex = i
+          cardIndexInTrick = trickEvents[i].cards.findIndex(c => c.playerId === accusedId)
+          relevantTrick = trickEvents[i]
+          break
+        }
+      }
+    }
 
-    if (!relevantTrick) return // Safety check
+    if (!accusedPlay || !relevantTrick) return // Accused hasn't played
+
+    const card = accusedPlay.card
+
+    // Reconstruct the hand at the time of the play
+    const handBefore = this.reconstructHandAtPlay(accusedId, trickIndex, cardIndexInTrick)
 
     // Build trick state before the challenged card was played
-    const cardsBeforePlay = relevantTrick.cards.filter(c => c.playerId !== accused.id)
-
-    // Check if accused led the trick (was first to play)
-    const accusedLedTrick = relevantTrick.cards.length > 0 &&
-      relevantTrick.cards[0].playerId === accused.id
+    const cardsBeforePlay = relevantTrick.cards.slice(0, cardIndexInTrick)
 
     const trickBefore: Trick = {
       cards: cardsBeforePlay,
-      // If accused led, leadSuit should be null (they can play anything)
-      // Otherwise, preserve the original lead suit
-      leadSuit: accusedLedTrick ? null : relevantTrick.leadSuit,
+      leadSuit: cardsBeforePlay.length > 0 ? relevantTrick.leadSuit : null,
       winnerId: null
     }
 
@@ -764,12 +828,58 @@ export default class ThuneeServer implements Party.Server {
     // If play was invalid, challenger's team wins (caught cheating)
     const winningTeam = validation.valid ? accused.team : challenger.team
 
+    this.resolveChallengeResult(challengerId, accusedId, 'play', winningTeam, validation.valid, card)
+  }
+
+  handleChallengeJodhi(challengerId: string, accusedId: string, suit: Suit) {
+    if (this.state.phase !== "playing" && this.state.phase !== "trick-complete") return
+
+    const challenger = this.state.players.find(p => p.id === challengerId)
+    const accused = this.state.players.find(p => p.id === accusedId)
+
+    if (!challenger || !accused) return
+    if (challenger.team === accused.team) return // Can't challenge teammate
+
+    // Find the jodhi claim
+    const jodhiClaim = this.state.jodhiCalls.find(j => j.playerId === accusedId && j.suit === suit)
+    if (!jodhiClaim) return // No such claim
+
+    // Validate: check if Q+K exist in current hand + all cards played this round
+    const allCards = [...accused.hand, ...this.getPlayerCardsPlayed(accusedId)]
+    const hasQ = allCards.some(c => c.suit === suit && c.rank === 'Q')
+    const hasK = allCards.some(c => c.suit === suit && c.rank === 'K')
+    const isValid = hasQ && hasK
+
+    // Determine winning team
+    const winningTeam = isValid ? accused.team : challenger.team
+
+    // If jodhi was false, remove it from calls
+    if (!isValid) {
+      this.state.jodhiCalls = this.state.jodhiCalls.filter(
+        j => !(j.playerId === accusedId && j.suit === suit)
+      )
+    }
+
+    this.resolveChallengeResult(challengerId, accusedId, 'jodhi', winningTeam, isValid, undefined, suit)
+  }
+
+  resolveChallengeResult(
+    challengerId: string, 
+    accusedId: string, 
+    challengeType: 'play' | 'jodhi',
+    winningTeam: 0 | 1,
+    wasValid: boolean,
+    card?: Card,
+    suit?: Suit
+  ) {
     // Store challenge result for UI
     this.state.challengeResult = {
       challengerId,
-      accusedId: accused.id,
+      accusedId,
+      challengeType,
       card,
-      wasValid: validation.valid,
+      suit,
+      wasValid,
       winningTeam
     }
 
@@ -778,9 +888,9 @@ export default class ThuneeServer implements Party.Server {
       type: 'challenge',
       data: {
         challengerId,
-        accusedId: accused.id,
-        card,
-        wasValid: validation.valid,
+        accusedId,
+        card: card ?? { suit: suit!, rank: 'Q' }, // Placeholder for jodhi
+        wasValid,
         winningTeam
       },
       roundNumber: this.state.gameRound,
@@ -789,9 +899,6 @@ export default class ThuneeServer implements Party.Server {
 
     // Award 4 balls to winning team
     this.state.teams[winningTeam].balls += 4
-
-    // End round immediately
-    this.state.challengeWindow = false
 
     // Check for game over
     if (this.state.teams[0].balls >= 13 || this.state.teams[1].balls >= 13) {

@@ -119,13 +119,13 @@ export interface GameState {
   // Scoring
   teams: [TeamScore, TeamScore]
   
-  // For challenge system
-  lastPlayedCard: { playerId: string; card: Card } | null
-  challengeWindow: boolean
+  // Challenge result (displayed in modal after challenge resolves)
   challengeResult: {
     challengerId: string
     accusedId: string
-    card: Card
+    challengeType: 'play' | 'jodhi'
+    card?: Card        // for play challenges
+    suit?: Suit        // for jodhi challenges
     wasValid: boolean
     winningTeam: 0 | 1
   } | null
@@ -149,8 +149,8 @@ export type ClientMessage =
   | { type: 'call-jodhi'; suit: Suit }
   | { type: 'call-trumpless' }
   | { type: 'play-card'; card: Card }
-  | { type: 'challenge' }
-  | { type: 'accept-play' }
+  | { type: 'challenge-play'; accusedId: string }
+  | { type: 'challenge-jodhi'; accusedId: string; suit: Suit }
 
 // Messages from server to client
 export type ServerMessage =
