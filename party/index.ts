@@ -846,55 +846,77 @@ export default class ThuneeServer implements Party.Server {
     if (!challenger || !accused) return
     if (challenger.team === accused.team) return // Can't challenge teammate
 
-    // Find the accused's last play - check current trick first, then completed tricks
+    // Check ALL cards played by the accused this round for any invalid play
     const trickEvents = getTrickEvents(this.state.eventLog)
-    let trickIndex = -1
-    let cardIndexInTrick = -1
-    let relevantTrick: Trick | null = null
-    let accusedPlay: { playerId: string; card: Card } | undefined
+    let foundInvalidPlay = false
+    let invalidCard: Card | null = null
+
+    // Build list of all tricks to check (completed + current)
+    const allTricks: { trick: Trick; trickIndex: number }[] = [
+      ...trickEvents.map((t, i) => ({ trick: t, trickIndex: i })),
+    ]
     
-    // Check current trick first
-    accusedPlay = this.state.currentTrick.cards.find(c => c.playerId === accusedId)
-    if (accusedPlay) {
-      trickIndex = trickEvents.length // Current trick is "after" all completed tricks
-      cardIndexInTrick = this.state.currentTrick.cards.findIndex(c => c.playerId === accusedId)
-      relevantTrick = this.state.currentTrick
-    } else {
-      // Check completed tricks in reverse order (most recent first)
-      for (let i = trickEvents.length - 1; i >= 0; i--) {
-        accusedPlay = trickEvents[i].cards.find(c => c.playerId === accusedId)
-        if (accusedPlay) {
-          trickIndex = i
-          cardIndexInTrick = trickEvents[i].cards.findIndex(c => c.playerId === accusedId)
-          relevantTrick = trickEvents[i]
-          break
-        }
+    // Add current trick if it has cards
+    if (this.state.currentTrick.cards.length > 0) {
+      allTricks.push({ trick: this.state.currentTrick, trickIndex: trickEvents.length })
+    }
+
+    // Check each trick for invalid plays by the accused
+    for (const { trick, trickIndex } of allTricks) {
+      const accusedPlayIndex = trick.cards.findIndex(c => c.playerId === accusedId)
+      if (accusedPlayIndex === -1) continue
+
+      const accusedPlay = trick.cards[accusedPlayIndex]
+      const card = accusedPlay.card
+
+      // Reconstruct the hand at the time of this play
+      const handBefore = this.reconstructHandAtPlay(accusedId, trickIndex, accusedPlayIndex)
+
+      // Build trick state before the challenged card was played
+      const cardsBeforePlay = trick.cards.slice(0, accusedPlayIndex)
+
+      const trickBefore: Trick = {
+        cards: cardsBeforePlay,
+        leadSuit: cardsBeforePlay.length > 0 ? trick.leadSuit : null,
+        winnerId: null
+      }
+
+      const validation = isValidPlay(card, handBefore, trickBefore, this.state.trump)
+
+      if (!validation.valid) {
+        foundInvalidPlay = true
+        invalidCard = card
+        break // Found an invalid play, challenge succeeds
       }
     }
 
-    if (!accusedPlay || !relevantTrick) return // Accused hasn't played
-
-    const card = accusedPlay.card
-
-    // Reconstruct the hand at the time of the play
-    const handBefore = this.reconstructHandAtPlay(accusedId, trickIndex, cardIndexInTrick)
-
-    // Build trick state before the challenged card was played
-    const cardsBeforePlay = relevantTrick.cards.slice(0, cardIndexInTrick)
-
-    const trickBefore: Trick = {
-      cards: cardsBeforePlay,
-      leadSuit: cardsBeforePlay.length > 0 ? relevantTrick.leadSuit : null,
-      winnerId: null
+    // If no plays found at all, can't challenge
+    if (allTricks.every(({ trick }) => !trick.cards.some(c => c.playerId === accusedId))) {
+      return
     }
 
-    const validation = isValidPlay(card, handBefore, trickBefore, this.state.trump)
+    // Determine winning team: if all plays were valid, accused's team wins (bad challenge)
+    // If any play was invalid, challenger's team wins (caught cheating)
+    const allPlaysValid = !foundInvalidPlay
+    const winningTeam = allPlaysValid ? accused.team : challenger.team
+    
+    // Use the invalid card if found, otherwise use the most recent card played
+    const cardToShow = invalidCard ?? this.getMostRecentPlay(accusedId, trickEvents)
 
-    // Determine winning team: if play was valid, accused's team wins (bad challenge)
-    // If play was invalid, challenger's team wins (caught cheating)
-    const winningTeam = validation.valid ? accused.team : challenger.team
+    this.resolveChallengeResult(challengerId, accusedId, 'play', winningTeam, allPlaysValid, cardToShow ?? undefined)
+  }
 
-    this.resolveChallengeResult(challengerId, accusedId, 'play', winningTeam, validation.valid, card)
+  getMostRecentPlay(playerId: string, trickEvents: (Trick & { winnerId: string })[]): Card | null {
+    // Check current trick first
+    const currentPlay = this.state.currentTrick.cards.find(c => c.playerId === playerId)
+    if (currentPlay) return currentPlay.card
+    
+    // Check completed tricks in reverse order
+    for (let i = trickEvents.length - 1; i >= 0; i--) {
+      const play = trickEvents[i].cards.find(c => c.playerId === playerId)
+      if (play) return play.card
+    }
+    return null
   }
 
   handleChallengeJodhi(challengerId: string, accusedId: string, suit: Suit) {
