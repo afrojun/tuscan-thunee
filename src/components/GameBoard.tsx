@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { GameState, ClientMessage, Card as CardType, Suit } from '@/game/types'
 import { PlayerHand } from './PlayerHand'
 import { TrickArea } from './TrickArea'
@@ -12,6 +12,7 @@ import { ChallengeModal } from './ChallengeModal'
 import { JodhiButton } from './JodhiButton'
 import { TrickResultToast } from './TrickResultToast'
 import { BallCelebration } from './BallCelebration'
+import { useSound } from '@/hooks/useSound'
 
 interface GameBoardProps {
   gameState: GameState
@@ -27,6 +28,9 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
   const [isDealing, setIsDealing] = useState(false)
   const [prevPhase, setPrevPhase] = useState(gameState.phase)
   const [historyUnlocked, setHistoryUnlocked] = useState(false)
+  const { play: playSound } = useSound()
+  const prevTrickCardsRef = useRef(gameState.currentTrick.cards.length)
+  const prevCurrentPlayerRef = useRef(gameState.currentPlayerId)
   const currentPlayer = gameState.players.find(p => p.id === playerId)
   const isCurrentPlayer = gameState.currentPlayerId === playerId
   const isSpectator = !currentPlayer || currentPlayer.isSpectator
@@ -54,18 +58,67 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         amount: gameState.lastBallAward.amount,
       })
       setShowBallCelebration(true)
+      playSound('ball')
     }
-  }, [gameState.lastBallAward, gameState.players])
+  }, [gameState.lastBallAward, gameState.players, playSound])
+
+  // Sound when a card is played (trick cards count increases)
+  useEffect(() => {
+    const currentCount = gameState.currentTrick.cards.length
+    if (currentCount > prevTrickCardsRef.current && currentCount > 0) {
+      playSound('cardPlay')
+    }
+    prevTrickCardsRef.current = currentCount
+  }, [gameState.currentTrick.cards.length, playSound])
+
+  // Sound when it becomes your turn
+  useEffect(() => {
+    const isNowMyTurn = gameState.currentPlayerId === playerId
+    const wasNotMyTurn = prevCurrentPlayerRef.current !== playerId
+    if (isNowMyTurn && wasNotMyTurn && gameState.phase === 'playing') {
+      playSound('yourTurn')
+    }
+    prevCurrentPlayerRef.current = gameState.currentPlayerId
+  }, [gameState.currentPlayerId, playerId, gameState.phase, playSound])
+
+  // Sound when trick completes (you won)
+  useEffect(() => {
+    if (gameState.phase === 'trick-complete' && gameState.lastTrickResult) {
+      const winner = gameState.players.find(p => p.id === gameState.lastTrickResult?.winnerId)
+      if (winner?.team === currentPlayer?.team) {
+        playSound('trickWin')
+      }
+    }
+  }, [gameState.phase, gameState.lastTrickResult, gameState.players, currentPlayer?.team, playSound])
+
+  // Sound when challenge result appears
+  useEffect(() => {
+    if (gameState.challengeResult) {
+      playSound('challenge')
+    }
+  }, [gameState.challengeResult, playSound])
+
+  // Sound when game ends
+  useEffect(() => {
+    if (gameState.phase === 'game-over') {
+      playSound('gameOver')
+    }
+  }, [gameState.phase, playSound])
 
   // Detect dealing - when phase transitions to bidding, trigger deal animation
   useEffect(() => {
     if (prevPhase !== 'bidding' && gameState.phase === 'bidding') {
       setIsDealing(true)
+      // Play deal sounds with stagger
+      const cardCount = currentPlayer?.hand.length ?? 4
+      for (let i = 0; i < cardCount; i++) {
+        setTimeout(() => playSound('cardDeal'), i * 100)
+      }
       const timer = setTimeout(() => setIsDealing(false), 1000)
       return () => clearTimeout(timer)
     }
     setPrevPhase(gameState.phase)
-  }, [gameState.phase, prevPhase])
+  }, [gameState.phase, prevPhase, currentPlayer?.hand.length, playSound])
 
   const handlePlayCard = (card: CardType) => {
     onAction({ type: 'play-card', card })
