@@ -18,6 +18,7 @@ export function createInitialState(gameId: string, playerCount: 2 | 4): GameStat
     trump: null,
     trumpCallerId: null,
     isLastCardTrump: false,
+    trumpRevealed: false,
     
     thuneeCallerId: null,
     jodhiCalls: [],

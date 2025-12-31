@@ -1,13 +1,30 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 interface GameHeaderProps {
   gameId: string
+  onUnlockHistory?: () => void
 }
 
-export function GameHeader({ gameId }: GameHeaderProps) {
+export function GameHeader({ gameId, onUnlockHistory }: GameHeaderProps) {
   const navigate = useNavigate()
   const [showHelp, setShowHelp] = useState(false)
+  const tapCountRef = useRef(0)
+  const lastTapRef = useRef(0)
+
+  const handleGameCodeTap = () => {
+    const now = Date.now()
+    if (now - lastTapRef.current > 1000) {
+      tapCountRef.current = 0
+    }
+    lastTapRef.current = now
+    tapCountRef.current++
+    
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0
+      onUnlockHistory?.()
+    }
+  }
 
   const handleLeave = () => {
     if (confirm('Leave this game?')) {
@@ -24,7 +41,10 @@ export function GameHeader({ gameId }: GameHeaderProps) {
         >
           ← Leave
         </button>
-        <span className="font-mono text-xs text-retro-cream/50">
+        <span 
+          className="font-mono text-xs text-retro-cream/50 cursor-pointer select-none"
+          onClick={handleGameCodeTap}
+        >
           {gameId}
         </span>
         <button

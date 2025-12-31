@@ -26,6 +26,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
   const [celebrationData, setCelebrationData] = useState<{ teamName: string; amount: number } | null>(null)
   const [isDealing, setIsDealing] = useState(false)
   const [prevPhase, setPrevPhase] = useState(gameState.phase)
+  const [historyUnlocked, setHistoryUnlocked] = useState(false)
   const currentPlayer = gameState.players.find(p => p.id === playerId)
   const isCurrentPlayer = gameState.currentPlayerId === playerId
   const isSpectator = !currentPlayer || currentPlayer.isSpectator
@@ -160,7 +161,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden">
       {/* Game header */}
-      <GameHeader gameId={gameState.id} />
+      <GameHeader gameId={gameState.id} onUnlockHistory={() => setHistoryUnlocked(true)} />
 
       <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
         {/* Spectator banner */}
@@ -181,7 +182,9 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         jodhiCalls={gameState.jodhiCalls}
         eventLog={gameState.eventLog}
         trump={gameState.trump}
+        trumpRevealed={gameState.trumpRevealed}
         isKhanaakGame={gameState.isKhanaakGame}
+        historyUnlocked={historyUnlocked}
       />
 
       {/* Top opponent (partner in 4p, opponent in 2p) */}

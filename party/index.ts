@@ -220,6 +220,7 @@ export default class ThuneeServer implements Party.Server {
     this.state.bidState = createEmptyBidState()
     this.state.trump = null
     this.state.trumpCallerId = null
+    this.state.trumpRevealed = false
     this.state.thuneeCallerId = null
     this.state.jodhiCalls = []
     this.state.jodhiWindow = false
@@ -508,6 +509,10 @@ export default class ThuneeServer implements Party.Server {
     // Add to trick
     if (this.state.currentTrick.cards.length === 0) {
       this.state.currentTrick.leadSuit = card.suit
+      // Reveal trump when first card of first trick is played
+      if (this.state.tricksPlayed === 0 && !this.state.trumpRevealed) {
+        this.state.trumpRevealed = true
+      }
     }
     this.state.currentTrick.cards.push({ playerId, card })
 
@@ -665,9 +670,13 @@ export default class ThuneeServer implements Party.Server {
       }
     } else {
       // Normal scoring
+      // "Call and lost": if trump team called (bid > 0) and loses, counting team gets 2 balls
+      const trumpTeamCalled = this.state.bidState.currentBid > 0
+      
       if (countingScore >= target) {
-        this.state.teams[countingTeam].balls += 1
-        this.state.lastBallAward = { team: countingTeam, amount: 1, reason: 'normal' }
+        const ballsWon = trumpTeamCalled ? 2 : 1
+        this.state.teams[countingTeam].balls += ballsWon
+        this.state.lastBallAward = { team: countingTeam, amount: ballsWon, reason: 'normal' }
       } else {
         this.state.teams[trumpTeam].balls += 1
         this.state.lastBallAward = { team: trumpTeam, amount: 1, reason: 'normal' }

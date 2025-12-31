@@ -102,6 +102,7 @@ export interface GameState {
   trump: Suit | null
   trumpCallerId: string | null
   isLastCardTrump: boolean
+  trumpRevealed: boolean  // True after first card is played
   
   // Special calls
   thuneeCallerId: string | null

@@ -19,7 +19,9 @@ interface ScoreBoardProps {
   jodhiCalls?: JodhiCall[]
   eventLog?: GameEvent[]
   trump?: Suit | null
+  trumpRevealed?: boolean
   isKhanaakGame?: boolean
+  historyUnlocked?: boolean
 }
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -50,7 +52,9 @@ export function ScoreBoard({
   jodhiCalls = [],
   eventLog = [],
   trump,
-  isKhanaakGame = false
+  trumpRevealed = false,
+  isKhanaakGame = false,
+  historyUnlocked = false
 }: ScoreBoardProps) {
   const winThreshold = isKhanaakGame ? 13 : 12
   const [showHistory, setShowHistory] = useState(false)
@@ -93,8 +97,8 @@ export function ScoreBoard({
   return (
     <div className="relative">
       <div 
-        className="card-container p-3 sm:p-4 cursor-pointer select-none"
-        onClick={() => setShowHistory(!showHistory)}
+        className={`card-container p-3 sm:p-4 select-none ${historyUnlocked ? 'cursor-pointer' : ''}`}
+        onClick={() => historyUnlocked && setShowHistory(!showHistory)}
       >
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
@@ -138,8 +142,11 @@ export function ScoreBoard({
 
         {(currentBid > 0 || showRoundIndicator || trump) && (
           <div className="mt-2 pt-2 border-t border-retro-black/30 flex justify-center gap-4 font-mono text-sm sm:text-base text-gray-600">
-            {trump && (
+            {trump && trumpRevealed && (
               <span className="flex items-center gap-1">Trump: <span className={`font-bold text-xl leading-none ${SUIT_COLORS[trump]}`}>{SUIT_SYMBOLS[trump]}</span></span>
+            )}
+            {trump && !trumpRevealed && (
+              <span className="flex items-center gap-1">Trump: <span className="font-bold text-xl leading-none">?</span></span>
             )}
             {currentBid > 0 && (
               <span>Call: <span className="font-bold">{currentBid}</span></span>
@@ -150,14 +157,16 @@ export function ScoreBoard({
           </div>
         )}
 
-        {/* Tap indicator */}
-        <div className="absolute bottom-1 right-2 text-xs text-gray-400">
-          {showHistory ? '▲' : '▼'}
-        </div>
+        {/* Tap indicator - only when history is unlocked */}
+        {historyUnlocked && (
+          <div className="absolute bottom-1 right-2 text-xs text-gray-400">
+            {showHistory ? '▲' : '▼'}
+          </div>
+        )}
       </div>
 
       {/* History drawer */}
-      {showHistory && (
+      {showHistory && historyUnlocked && (
         <div className="card-container mt-1 p-3 max-h-64 overflow-y-auto">
           <p className="font-retro text-xs text-retro-black mb-2">GAME LOG</p>
           {eventLog.length === 0 ? (
