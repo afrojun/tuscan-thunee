@@ -6,10 +6,12 @@ on:
     paths:
       - 'party/**'
       - 'src/game/**'
+      - '.github/workflows/deploy-partykit.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       
@@ -22,4 +24,5 @@ jobs:
       - name: Deploy to PartyKit
         run: npx partykit deploy
         env:
+          PARTYKIT_LOGIN: ${{ secrets.PARTYKIT_LOGIN }}
           PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
