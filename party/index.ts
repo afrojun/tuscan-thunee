@@ -39,9 +39,11 @@ interface ConnectionState {
 const CALL_TIMER_MS = 10000 // 10 seconds
 const TRICK_DISPLAY_MS = 2000 // 2 seconds to show completed trick
 
-function getTrickEvents(eventLog: GameEvent[]): (Trick & { winnerId: string })[] {
+function getTrickEvents(eventLog: GameEvent[], roundNumber?: number): (Trick & { winnerId: string })[] {
   return eventLog
-    .filter((e): e is Extract<GameEvent, { type: 'trick' }> => e.type === 'trick')
+    .filter((e): e is Extract<GameEvent, { type: 'trick' }> => 
+      e.type === 'trick' && (roundNumber === undefined || e.roundNumber === roundNumber)
+    )
     .map(e => e.data)
 }
 
@@ -782,7 +784,7 @@ export default class ThuneeServer implements Party.Server {
 
   // Get all cards a player has played this round (from event log + current trick)
   getPlayerCardsPlayed(playerId: string): Card[] {
-    const trickEvents = getTrickEvents(this.state.eventLog)
+    const trickEvents = getTrickEvents(this.state.eventLog, this.state.gameRound)
     const cardsPlayed: Card[] = []
     
     // Cards from completed tricks this round
@@ -804,7 +806,7 @@ export default class ThuneeServer implements Party.Server {
     const accused = this.state.players.find(p => p.id === playerId)
     if (!accused) return []
     
-    const trickEvents = getTrickEvents(this.state.eventLog)
+    const trickEvents = getTrickEvents(this.state.eventLog, this.state.gameRound)
     const hand = [...accused.hand]
     
     // Add back cards played after the challenged play
@@ -847,7 +849,7 @@ export default class ThuneeServer implements Party.Server {
     if (challenger.team === accused.team) return // Can't challenge teammate
 
     // Check ALL cards played by the accused this round for any invalid play
-    const trickEvents = getTrickEvents(this.state.eventLog)
+    const trickEvents = getTrickEvents(this.state.eventLog, this.state.gameRound)
     let foundInvalidPlay = false
     let invalidCard: Card | null = null
 
