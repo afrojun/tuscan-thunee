@@ -18,7 +18,7 @@ export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled }: Pla
 
   return (
     <div className="flex justify-center px-4">
-      <div className="relative flex items-end justify-center" style={{ height: '160px' }}>
+      <div className="relative flex items-end justify-center" style={{ height: '140px' }}>
         {cards.map((card, i) => {
           const angle = cardCount === 1 ? 0 : startAngle + (i * angleStep)
           // Cards at edges are slightly lower (arc effect)

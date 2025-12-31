@@ -195,35 +195,11 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
           )}
 
           {(gameState.phase === 'playing' || gameState.phase === 'trick-complete') && (
-            <div className="space-y-2 max-h-full overflow-y-auto">
-              <TrickArea
-                trick={gameState.currentTrick}
-                players={gameState.players}
-                showingResult={gameState.phase === 'trick-complete'}
-              />
-
-              {/* Jodhi button - only for winning team after trick */}
-              {canCallJodhi() && currentPlayer && (
-                <JodhiButton
-                  trump={gameState.trump}
-                  calledJodhiSuits={myCalledJodhiSuits}
-                  onCallJodhi={handleCallJodhi}
-                  disabled={false}
-                />
-              )}
-
-              {/* Challenge button - available during play for non-spectators */}
-              {!isSpectator && opponents.length > 0 && (
-                <div className="text-center">
-                  <button
-                    onClick={() => setShowChallengeModal(true)}
-                    className="btn-danger text-xs"
-                  >
-                    ⚡ CHALLENGE
-                  </button>
-                </div>
-              )}
-            </div>
+            <TrickArea
+              trick={gameState.currentTrick}
+              players={gameState.players}
+              showingResult={gameState.phase === 'trick-complete'}
+            />
           )}
 
           {gameState.phase === 'round-end' && (
@@ -289,6 +265,31 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             isCurrentPlayer={isCurrentPlayer && gameState.phase === 'playing'}
             disabled={gameState.phase !== 'playing'}
           />
+          
+          {/* Action buttons - below cards */}
+          {(gameState.phase === 'playing' || gameState.phase === 'trick-complete') && (
+            <div className="flex justify-center gap-2 mt-3">
+              {/* Jodhi button - only for winning team after trick */}
+              {canCallJodhi() && (
+                <JodhiButton
+                  trump={gameState.trump}
+                  calledJodhiSuits={myCalledJodhiSuits}
+                  onCallJodhi={handleCallJodhi}
+                  disabled={false}
+                />
+              )}
+
+              {/* Challenge button */}
+              {opponents.length > 0 && (
+                <button
+                  onClick={() => setShowChallengeModal(true)}
+                  className="btn-danger text-xs"
+                >
+                  ⚡ CHALLENGE
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
