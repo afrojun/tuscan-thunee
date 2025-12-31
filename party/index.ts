@@ -459,9 +459,9 @@ export default class ThuneeServer implements Party.Server {
     this.state.trump = suit
     this.state.isLastCardTrump = lastCard ?? false
 
-    // Person to the right of trumper leads first trick
+    // Player after trumper (in play order) leads first trick
     const trumperIndex = this.state.players.findIndex(p => p.id === playerId)
-    const leaderIndex = (trumperIndex + this.state.playerCount - 1) % this.state.playerCount
+    const leaderIndex = (trumperIndex + 1) % this.state.playerCount
     this.state.currentPlayerId = this.state.players[leaderIndex].id
     this.state.phase = "playing"
   }
@@ -473,9 +473,9 @@ export default class ThuneeServer implements Party.Server {
     this.state.thuneeCallerId = playerId
     this.state.trump = null // No trump in Thunee
 
-    // Person to the right of thunee caller leads first trick
+    // Player after thunee caller (in play order) leads first trick
     const callerIndex = this.state.players.findIndex(p => p.id === playerId)
-    const leaderIndex = (callerIndex + this.state.playerCount - 1) % this.state.playerCount
+    const leaderIndex = (callerIndex + 1) % this.state.playerCount
     this.state.currentPlayerId = this.state.players[leaderIndex].id
     this.state.phase = "playing"
   }
