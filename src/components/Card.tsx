@@ -53,8 +53,10 @@ export function Card({
         ${sizeClasses}
         bg-white border-2 border-gray-300 rounded-lg shadow-md
         flex flex-col items-center justify-center gap-0
-        transition-transform duration-100
-        ${!disabled ? 'hover:-translate-y-2 hover:shadow-lg cursor-pointer' : 'cursor-default'}
+        transition-all duration-150
+        ${!disabled 
+          ? 'hover:-translate-y-3 hover:scale-105 hover:shadow-xl hover:border-retro-gold/50 cursor-pointer active:scale-95' 
+          : 'cursor-default'}
         ${selected ? '-translate-y-3 ring-2 ring-retro-gold' : ''}
         ${SUIT_COLORS[card.suit]}
       `}

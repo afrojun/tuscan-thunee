@@ -1,35 +1,35 @@
 import type * as Party from "partykit/server"
-import type { 
-  GameState, 
-  ClientMessage, 
-  ServerMessage, 
-  Card, 
+import type {
+  GameState,
+  ClientMessage,
+  ServerMessage,
+  Card,
   Suit,
   Player,
   GameEvent,
   Trick
 } from "../src/game/types"
-import { 
-  createInitialState, 
-  createPlayer, 
+import {
+  createInitialState,
+  createPlayer,
   createEmptyTrick,
   createEmptyBidState,
   serializeState,
-  deserializeState 
+  deserializeState
 } from "../src/game/state"
-import { 
-  createDeck, 
-  shuffleDeck, 
-  cardEquals 
+import {
+  createDeck,
+  shuffleDeck,
+  cardEquals
 } from "../src/game/deck"
-import { 
-  isValidPlay, 
-  getTrickWinner, 
-  getTrickPoints 
+import {
+  isValidPlay,
+  getTrickWinner,
+  getTrickPoints
 } from "../src/game/rules"
-import { 
-  getTeamForPlayer, 
-  getNextPlayerIndex 
+import {
+  getTeamForPlayer,
+  getNextPlayerIndex
 } from "../src/game/utils"
 
 interface ConnectionState {
@@ -37,6 +37,7 @@ interface ConnectionState {
 }
 
 const CALL_TIMER_MS = 10000 // 10 seconds
+const TRICK_DISPLAY_MS = 2000 // 2 seconds to show completed trick
 
 function getTrickEvents(eventLog: GameEvent[]): (Trick & { winnerId: string })[] {
   return eventLog
@@ -44,9 +45,12 @@ function getTrickEvents(eventLog: GameEvent[]): (Trick & { winnerId: string })[]
     .map(e => e.data)
 }
 
+type AlarmType = 'bidding' | 'trick-display'
+
 export default class ThuneeServer implements Party.Server {
   state: GameState
   connectionPlayerMap: Map<string, string> = new Map() // connectionId -> playerId
+  pendingAlarmType: AlarmType | null = null
 
   constructor(readonly room: Party.Room) {
     this.state = createInitialState(room.id, 4)
@@ -94,12 +98,12 @@ export default class ThuneeServer implements Party.Server {
     // Generate a temporary player ID - will be replaced on join if reconnecting
     const playerId = crypto.randomUUID()
     this.connectionPlayerMap.set(conn.id, playerId)
-    
+
     // Send current state immediately
-    conn.send(JSON.stringify({ 
-      type: "state", 
-      state: this.state, 
-      playerId 
+    conn.send(JSON.stringify({
+      type: "state",
+      state: this.state,
+      playerId
     }))
   }
 
@@ -159,15 +163,15 @@ export default class ThuneeServer implements Party.Server {
 
   handleJoin(playerId: string, name: string, playerCount: 2 | 4 | undefined, conn: Party.Connection, existingPlayerId?: string) {
     // Check if this is a reconnection by playerId first, then by name
-    let existingPlayer = existingPlayerId 
+    let existingPlayer = existingPlayerId
       ? this.state.players.find(p => p.id === existingPlayerId)
       : null
-    
+
     // Fallback to name-based reconnection
     if (!existingPlayer) {
       existingPlayer = this.state.players.find(p => p.name === name)
     }
-    
+
     if (existingPlayer) {
       existingPlayer.connected = true
       this.connectionPlayerMap.set(conn.id, existingPlayer.id)
@@ -244,7 +248,7 @@ export default class ThuneeServer implements Party.Server {
     const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
     const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
     this.state.bidState.defaultTrumperId = this.state.players[rhoIndex].id
-    
+
     // Move to calling phase with timer
     // Others have 10s to call, otherwise default trumper's selection is used
     this.state.phase = "bidding"
@@ -255,6 +259,7 @@ export default class ThuneeServer implements Party.Server {
   async startCallTimer() {
     // Set timer end time
     this.state.bidState.timerEndsAt = Date.now() + CALL_TIMER_MS
+    this.pendingAlarmType = 'bidding'
 
     // Use PartyKit's alarm API for reliable server-side timer
     await this.room.storage.setAlarm(Date.now() + CALL_TIMER_MS)
@@ -263,10 +268,22 @@ export default class ThuneeServer implements Party.Server {
     this.broadcastState()
   }
 
+  async startTrickDisplayTimer() {
+    this.pendingAlarmType = 'trick-display'
+    await this.room.storage.setAlarm(Date.now() + TRICK_DISPLAY_MS)
+    await this.saveState()
+    this.broadcastState()
+  }
+
   // PartyKit alarm handler - called when alarm fires
   async onAlarm() {
-    if (this.state.phase === "bidding") {
+    const alarmType = this.pendingAlarmType
+    this.pendingAlarmType = null
+
+    if (alarmType === 'bidding' && this.state.phase === "bidding") {
       this.onCallTimerExpired()
+    } else if (alarmType === 'trick-display' && this.state.phase === "trick-complete") {
+      this.onTrickDisplayComplete()
     }
   }
 
@@ -281,7 +298,7 @@ export default class ThuneeServer implements Party.Server {
       // No one called - default trumper sets trump
       this.state.trumpCallerId = this.state.bidState.defaultTrumperId
       this.state.bidState.bidderId = null
-      
+
       // If trumper pre-selected, use that trump directly
       if (this.state.bidState.preSelectedTrump) {
         this.state.trump = this.state.bidState.preSelectedTrump
@@ -300,17 +317,17 @@ export default class ThuneeServer implements Party.Server {
       this.state.trumpCallerId = this.state.bidState.bidderId
       this.endBidding()
     }
-    
+
     this.saveState()
     this.broadcastState()
   }
 
   handleBid(playerId: string, amount: number) {
     if (this.state.phase !== "bidding") return
-    
+
     // Check if player has passed
     if (this.state.bidState.passed.has(playerId)) return
-    
+
     // Validate bid amount
     if (amount <= this.state.bidState.currentBid) return
     if (amount > 104) return
@@ -318,7 +335,7 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.bidState.currentBid = amount
     this.state.bidState.bidderId = playerId
-    
+
     // Clear any pre-selected trump - bidding war invalidates it
     this.state.bidState.preSelectedTrump = null
 
@@ -330,7 +347,7 @@ export default class ThuneeServer implements Party.Server {
     if (this.state.phase !== "bidding") return
     // Only relevant if timer is running (someone called)
     if (!this.state.bidState.timerEndsAt) return
-    
+
     // Can't pass twice
     if (this.state.bidState.passed.has(playerId)) return
 
@@ -352,7 +369,7 @@ export default class ThuneeServer implements Party.Server {
     if (playerId !== this.state.bidState.defaultTrumperId) return
     // Can't preselect if someone has already called
     if (this.state.bidState.currentBid > 0) return
-    
+
     this.state.bidState.preSelectedTrump = suit
   }
 
@@ -399,7 +416,7 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.trump = suit
     this.state.isLastCardTrump = lastCard ?? false
-    
+
     // Person to the right of trumper leads first trick
     const trumperIndex = this.state.players.findIndex(p => p.id === playerId)
     const leaderIndex = (trumperIndex + this.state.playerCount - 1) % this.state.playerCount
@@ -413,7 +430,7 @@ export default class ThuneeServer implements Party.Server {
 
     this.state.thuneeCallerId = playerId
     this.state.trump = null // No trump in Thunee
-    
+
     // Person to the right of thunee caller leads first trick
     const callerIndex = this.state.players.findIndex(p => p.id === playerId)
     const leaderIndex = (callerIndex + this.state.playerCount - 1) % this.state.playerCount
@@ -424,26 +441,26 @@ export default class ThuneeServer implements Party.Server {
   handleCallJodhi(playerId: string, suit: Suit) {
     if (this.state.phase !== "playing") return
     if (!this.state.jodhiWindow) return
-    
+
     // Caller must be on the winning team
     const caller = this.state.players.find(p => p.id === playerId)
     if (!caller) return
     if (caller.team !== this.state.lastTrickWinningTeam) return
-    
+
     // Check if already called Jodhi for this suit by this player
-    const alreadyCalled = this.state.jodhiCalls.some(j => 
+    const alreadyCalled = this.state.jodhiCalls.some(j =>
       j.playerId === playerId && j.suit === suit
     )
     if (alreadyCalled) return
-    
+
     // Check if player has Q+K in the suit (honor system, but validate they have cards)
     const hasQ = caller.hand.some(c => c.suit === suit && c.rank === 'Q')
     const hasK = caller.hand.some(c => c.suit === suit && c.rank === 'K')
     const hasJ = caller.hand.some(c => c.suit === suit && c.rank === 'J')
-    
+
     // Must have at least Q+K (honor system - we trust the player)
     if (!hasQ || !hasK) return
-    
+
     // Calculate points
     const isTrump = suit === this.state.trump
     let points: number
@@ -452,7 +469,7 @@ export default class ThuneeServer implements Party.Server {
     } else {
       points = isTrump ? 40 : 20
     }
-    
+
     this.state.jodhiCalls.push({
       playerId,
       points,
@@ -464,7 +481,7 @@ export default class ThuneeServer implements Party.Server {
   handlePlayCard(playerId: string, card: Card) {
     if (this.state.phase !== "playing") return
     if (this.state.currentPlayerId !== playerId) return
-    
+
     // Close previous windows and clear last trick result when a card is played
     this.state.jodhiWindow = false
     this.state.challengeWindow = false  // Close previous challenge window
@@ -512,7 +529,7 @@ export default class ThuneeServer implements Party.Server {
     // Find winning card and determine reason
     const winningPlay = this.state.currentTrick.cards.find(c => c.playerId === winnerId)!
     const wonByTrump = this.state.trump && winningPlay.card.suit === this.state.trump
-    
+
     // Store trick result for UI display
     this.state.lastTrickResult = {
       winnerId,
@@ -533,25 +550,36 @@ export default class ThuneeServer implements Party.Server {
     this.state.tricksPlayed++
     // Keep challengeWindow open so last card can be challenged
     // It will close when next card is played or round ends
-    
+
     // Open jodhi window for winning team
     this.state.jodhiWindow = true
     this.state.lastTrickWinningTeam = winner.team
 
+    // Enter trick-complete phase to show the winner briefly
+    this.state.phase = "trick-complete"
+    this.startTrickDisplayTimer()
+  }
+
+  onTrickDisplayComplete() {
     // Check if round is over (6 tricks for 4 players, 6 per round for 2 players)
     if (this.state.tricksPlayed === 6) {
       this.state.challengeWindow = false // Close at end of round
       this.endRound()
     } else {
       // Winner leads next trick
+      const winnerId = this.state.currentTrick.winnerId!
       this.state.currentTrick = createEmptyTrick()
       this.state.currentPlayerId = winnerId
+      this.state.phase = "playing"
     }
+
+    this.saveState()
+    this.broadcastState()
   }
 
   endRound() {
     const trickEvents = getTrickEvents(this.state.eventLog)
-    
+
     // Award 10 points for last trick
     const lastTrick = trickEvents[trickEvents.length - 1]
     if (lastTrick?.winnerId) {
@@ -565,7 +593,7 @@ export default class ThuneeServer implements Party.Server {
     if (this.state.playerCount === 2 && this.state.dealRound === 1 && this.state.thuneeCallerId) {
       const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
       const thuneeTeam = thuneePlayer.team
-      
+
       const wonAllTricks = trickEvents.every(t => {
         const winner = this.state.players.find(p => p.id === t.winnerId)
         return winner?.team === thuneeTeam
@@ -594,11 +622,11 @@ export default class ThuneeServer implements Party.Server {
     // Award balls (after Round 2 in 2-player, or after 6 tricks in 4-player)
     const trumpTeam = this.state.players.find(p => p.id === this.state.trumpCallerId)?.team ?? 0
     const countingTeam = trumpTeam === 0 ? 1 : 0
-    
+
     // Calculate Jodhi points by team
     let trumpTeamJodhi = 0
     let countingTeamJodhi = 0
-    
+
     for (const jodhi of this.state.jodhiCalls) {
       const jodhiPlayer = this.state.players.find(p => p.id === jodhi.playerId)
       if (jodhiPlayer?.team === trumpTeam) {
@@ -607,7 +635,7 @@ export default class ThuneeServer implements Party.Server {
         countingTeamJodhi += jodhi.points
       }
     }
-    
+
     // Adjusted target and score with Jodhi
     const target = 105 - this.state.bidState.currentBid + trumpTeamJodhi
     const countingScore = this.state.teams[countingTeam].cardPoints + countingTeamJodhi
@@ -616,7 +644,7 @@ export default class ThuneeServer implements Party.Server {
       // Thunee in 4-player mode or Round 2 of 2-player
       const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
       const thuneeTeam = thuneePlayer.team
-      
+
       // For 2-player Round 2, check all 12 tricks
       const wonAllTricks = trickEvents.every(t => {
         const winner = this.state.players.find(p => p.id === t.winnerId)
@@ -660,13 +688,13 @@ export default class ThuneeServer implements Party.Server {
         this.state.players[i].hand.push(this.state.deck[12 + i * 6 + j])
       }
     }
-    
+
     // Skip directly to playing - trump and bid carry over
     this.state.phase = "playing"
     this.state.currentTrick = createEmptyTrick()
     this.state.tricksPlayed = 0
     // Don't reset eventLog - need full history for cumulative scoring
-    
+
     // Winner of last trick from Round 1 leads
     const trickEvents = getTrickEvents(this.state.eventLog)
     const lastTrick = trickEvents[trickEvents.length - 1]
@@ -682,7 +710,7 @@ export default class ThuneeServer implements Party.Server {
     const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
     const nextDealerIndex = getNextPlayerIndex(dealerIndex, this.state.playerCount)
     this.state.dealerId = this.state.players[nextDealerIndex].id
-    
+
     // Reset for next deal
     this.state.teams[0].cardPoints = 0
     this.state.teams[1].cardPoints = 0
@@ -697,31 +725,31 @@ export default class ThuneeServer implements Party.Server {
 
     const challenger = this.state.players.find(p => p.id === challengerId)
     const accused = this.state.players.find(p => p.id === this.state.lastPlayedCard!.playerId)
-    
+
     if (!challenger || !accused) return
     if (challenger.team === accused.team) return // Can't challenge teammate
 
     const card = this.state.lastPlayedCard.card
-    
+
     // Reconstruct the hand before the play
     const handBefore = [...accused.hand, card]
-    
+
     // Get the relevant trick - if currentTrick is empty (trick just completed),
     // use the last trick from event log
     const trickEvents = getTrickEvents(this.state.eventLog)
-    const relevantTrick = this.state.currentTrick.cards.length > 0 
-      ? this.state.currentTrick 
+    const relevantTrick = this.state.currentTrick.cards.length > 0
+      ? this.state.currentTrick
       : trickEvents[trickEvents.length - 1]
-    
+
     if (!relevantTrick) return // Safety check
-    
+
     // Build trick state before the challenged card was played
     const cardsBeforePlay = relevantTrick.cards.filter(c => c.playerId !== accused.id)
-    
+
     // Check if accused led the trick (was first to play)
-    const accusedLedTrick = relevantTrick.cards.length > 0 && 
-                            relevantTrick.cards[0].playerId === accused.id
-    
+    const accusedLedTrick = relevantTrick.cards.length > 0 &&
+      relevantTrick.cards[0].playerId === accused.id
+
     const trickBefore: Trick = {
       cards: cardsBeforePlay,
       // If accused led, leadSuit should be null (they can play anything)
@@ -744,7 +772,7 @@ export default class ThuneeServer implements Party.Server {
       wasValid: validation.valid,
       winningTeam
     }
-    
+
     // Add to event log
     this.state.eventLog.push({
       type: 'challenge',
@@ -764,7 +792,7 @@ export default class ThuneeServer implements Party.Server {
 
     // End round immediately
     this.state.challengeWindow = false
-    
+
     // Check for game over
     if (this.state.teams[0].balls >= 13 || this.state.teams[1].balls >= 13) {
       this.state.phase = "game-over"

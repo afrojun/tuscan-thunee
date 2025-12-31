@@ -66,6 +66,7 @@ export type GamePhase =
   | 'dealing-second'   // Last 2 cards dealt
   | 'calling'          // Thunee can be called
   | 'playing'          // Trick-taking
+  | 'trick-complete'   // Brief pause showing completed trick
   | 'round-end'        // Scoring a round
   | 'game-over'
 

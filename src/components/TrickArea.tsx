@@ -1,70 +1,48 @@
 import { Card } from './Card'
-import type { Trick, Player, Suit } from '@/game/types'
+import type { Trick, Player } from '@/game/types'
 
 interface TrickAreaProps {
   trick: Trick
   players: Player[]
-  currentPlayerId: string | null
-  trump: Suit | null
+  showingResult?: boolean
 }
 
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '♥',
-  diamonds: '♦',
-  clubs: '♣',
-  spades: '♠',
-}
-
-export function TrickArea({ trick, players, currentPlayerId, trump }: TrickAreaProps) {
+export function TrickArea({ trick, players, showingResult = false }: TrickAreaProps) {
   // For 4 players: position cards at top, right, bottom, left
   // For 2 players: position at top and bottom
   const getPosition = (playerIndex: number, totalPlayers: number) => {
     if (totalPlayers === 4) {
       const positions = [
-        'bottom-0 left-1/2 -translate-x-1/2 translate-y-2',
-        'right-0 top-1/2 -translate-y-1/2 translate-x-2',
-        'top-0 left-1/2 -translate-x-1/2 -translate-y-2',
-        'left-0 top-1/2 -translate-y-1/2 -translate-x-2',
+        'bottom-2 left-1/2 -translate-x-1/2',    // bottom (me)
+        'right-2 top-1/2 -translate-y-1/2',      // right
+        'top-2 left-1/2 -translate-x-1/2',       // top (partner)
+        'left-2 top-1/2 -translate-y-1/2',       // left
       ]
       return positions[playerIndex]
     } else {
       const positions = [
-        'bottom-0 left-1/2 -translate-x-1/2 translate-y-2',
-        'top-0 left-1/2 -translate-x-1/2 -translate-y-2',
+        'bottom-2 left-1/2 -translate-x-1/2',    // bottom (me)
+        'top-2 left-1/2 -translate-x-1/2',       // top (opponent)
       ]
       return positions[playerIndex]
     }
   }
 
   return (
-    <div className="relative w-48 h-48 sm:w-64 sm:h-64 mx-auto">
-      {/* Trump indicator */}
-      {trump && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
-                        font-retro text-2xl text-retro-gold/30">
-          {SUIT_SYMBOLS[trump]}
-        </div>
-      )}
-
-      {/* Current player indicator */}
-      {currentPlayerId && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-8
-                        font-mono text-xs text-retro-cream/60">
-          {players.find(p => p.id === currentPlayerId)?.name}'s turn
-        </div>
-      )}
-
+    <div className="relative w-64 h-64 sm:w-80 sm:h-80 mx-auto">
       {/* Played cards */}
-      {trick.cards.map(({ playerId, card }) => {
+      {trick.cards.map(({ playerId, card }, index) => {
         const playerIndex = players.findIndex(p => p.id === playerId)
         const position = getPosition(playerIndex, players.length)
+        const isWinner = showingResult && trick.winnerId === playerId
+        const isLatestCard = !showingResult && index === trick.cards.length - 1
         
         return (
           <div
             key={`${playerId}-${card.suit}-${card.rank}`}
-            className={`absolute ${position}`}
+            className={`absolute ${position} ${isLatestCard ? 'animate-card-enter' : ''} ${isWinner ? 'animate-winner-glow rounded-lg' : ''}`}
           >
-            <Card card={card} small disabled />
+            <Card card={card} disabled />
           </div>
         )
       })}

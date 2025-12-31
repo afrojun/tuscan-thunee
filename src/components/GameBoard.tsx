@@ -122,7 +122,9 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
       {/* Top opponent (partner in 4p, opponent in 2p) */}
       <div className="flex flex-col items-center">
         <p className={`font-mono text-xs mb-1 ${
-          topPlayer?.id === gameState.currentPlayerId ? 'text-retro-gold' : 'text-retro-cream/60'
+          topPlayer?.id === gameState.currentPlayerId 
+            ? 'text-retro-gold animate-turn-pulse' 
+            : 'text-retro-cream/60'
         } ${topPlayer && !topPlayer.connected ? 'opacity-50' : ''}`}>
           {topPlayer?.name}
           {topPlayer && !topPlayer.connected && ' 📵'}
@@ -141,7 +143,9 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         {leftPlayer && (
           <div className="flex flex-col items-center shrink-0">
             <p className={`font-mono text-xs mb-1 writing-mode-vertical ${
-              leftPlayer.id === gameState.currentPlayerId ? 'text-retro-gold' : 'text-retro-cream/60'
+              leftPlayer.id === gameState.currentPlayerId 
+                ? 'text-retro-gold animate-turn-pulse' 
+                : 'text-retro-cream/60'
             } ${!leftPlayer.connected ? 'opacity-50' : ''}`}>
               {leftPlayer.name}
               {!leftPlayer.connected && ' 📵'}
@@ -177,13 +181,12 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             />
           )}
 
-          {gameState.phase === 'playing' && (
+          {(gameState.phase === 'playing' || gameState.phase === 'trick-complete') && (
             <div className="space-y-2">
               <TrickArea
                 trick={gameState.currentTrick}
                 players={gameState.players}
-                currentPlayerId={gameState.currentPlayerId}
-                trump={gameState.trump}
+                showingResult={gameState.phase === 'trick-complete'}
               />
 
               {/* Jodhi button - only for winning team after trick */}
@@ -204,7 +207,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
                     onClick={handleChallenge}
                     className="btn-danger text-xs"
                   >
-                    CHALLENGE!
+                    ⚡ CHALLENGE!
                   </button>
                 </div>
               )}
@@ -243,7 +246,9 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         {rightPlayer && (
           <div className="flex flex-col items-center shrink-0">
             <p className={`font-mono text-xs mb-1 ${
-              rightPlayer.id === gameState.currentPlayerId ? 'text-retro-gold' : 'text-retro-cream/60'
+              rightPlayer.id === gameState.currentPlayerId 
+                ? 'text-retro-gold animate-turn-pulse' 
+                : 'text-retro-cream/60'
             } ${!rightPlayer.connected ? 'opacity-50' : ''}`}>
               {rightPlayer.name}
               {!rightPlayer.connected && ' 📵'}
@@ -262,7 +267,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
       {currentPlayer && !isSpectator && (
         <div className="shrink-0 pb-2">
           <p className={`text-center font-mono text-xs mb-1 ${
-            isCurrentPlayer ? 'text-retro-gold' : 'text-retro-cream/60'
+            isCurrentPlayer ? 'text-retro-gold animate-turn-pulse' : 'text-retro-cream/60'
           }`}>
             {currentPlayer.name} {isCurrentPlayer && '(Your turn)'}
           </p>

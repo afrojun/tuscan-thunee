@@ -133,8 +133,11 @@ export function ScoreBoard({
           </div>
         </div>
 
-        {(currentBid > 0 || showRoundIndicator) && (
+        {(currentBid > 0 || showRoundIndicator || trump) && (
           <div className="mt-2 pt-2 border-t border-retro-black/30 flex justify-center gap-4 font-mono text-sm sm:text-base text-gray-600">
+            {trump && (
+              <span className="flex items-center gap-1">Trump: <span className={`font-bold text-xl leading-none ${SUIT_COLORS[trump]}`}>{SUIT_SYMBOLS[trump]}</span></span>
+            )}
             {currentBid > 0 && (
               <span>Call: <span className="font-bold">{currentBid}</span></span>
             )}
