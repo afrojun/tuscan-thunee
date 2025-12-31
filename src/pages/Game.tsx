@@ -76,11 +76,8 @@ export function Game() {
     )
   }
 
-  // Check if we're an existing player in the game
-  const isExistingPlayer = gameState?.players.some(p => p.id === playerId)
-  
-  // Show lobby if not joined, or if game is in waiting phase and we're not already a player
-  const showLobby = !hasJoined || !gameState || (gameState.phase === 'waiting' && !isExistingPlayer)
+  // Show lobby if not joined, no game state, or game is still in waiting phase
+  const showLobby = !hasJoined || !gameState || gameState.phase === 'waiting'
   
   if (showLobby) {
     return (
