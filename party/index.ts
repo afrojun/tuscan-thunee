@@ -252,10 +252,38 @@ export default class ThuneeServer implements Party.Server {
       }
     }
 
-    // Set default trumper (RHO of dealer)
-    const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-    const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
-    this.state.bidState.defaultTrumperId = this.state.players[rhoIndex].id
+    // Determine default trumper based on score
+    // 1. Team that is ahead gets to trump
+    // 2. If tied, team that won last round gets to trump
+    // 3. Otherwise, RHO of dealer
+    const team0Balls = this.state.teams[0].balls
+    const team1Balls = this.state.teams[1].balls
+    
+    // Get last round winner from event log
+    const lastRoundEnd = [...this.state.eventLog]
+      .reverse()
+      .find((e): e is Extract<typeof e, { type: 'round-end' }> => e.type === 'round-end')
+    const lastRoundWinner = lastRoundEnd?.data.winningTeam ?? null
+    
+    let trumpingTeam: 0 | 1 | null = null
+    if (team0Balls > team1Balls) {
+      trumpingTeam = 0
+    } else if (team1Balls > team0Balls) {
+      trumpingTeam = 1
+    } else if (lastRoundWinner !== null) {
+      trumpingTeam = lastRoundWinner
+    }
+    
+    if (trumpingTeam !== null) {
+      // Find a player from the trumping team to be default trumper
+      const trumpingPlayer = this.state.players.find(p => p.team === trumpingTeam)
+      this.state.bidState.defaultTrumperId = trumpingPlayer?.id ?? this.state.players[0].id
+    } else {
+      // Fallback: RHO of dealer
+      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
+      const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
+      this.state.bidState.defaultTrumperId = this.state.players[rhoIndex].id
+    }
 
     // Move to calling phase with timer
     // Others have 10s to call, otherwise default trumper's selection is used
@@ -609,10 +637,12 @@ export default class ThuneeServer implements Party.Server {
       if (wonAllTricks) {
         this.state.teams[thuneeTeam].balls += 4
         this.state.lastBallAward = { team: thuneeTeam, amount: 4, reason: 'thunee' }
+        this.logRoundEnd(thuneeTeam, 4, 'thunee')
       } else {
         const otherTeam = thuneeTeam === 0 ? 1 : 0
         this.state.teams[otherTeam].balls += 4
         this.state.lastBallAward = { team: otherTeam, amount: 4, reason: 'thunee' }
+        this.logRoundEnd(otherTeam, 4, 'thunee')
       }
 
       if (this.checkGameOver()) return
@@ -663,10 +693,12 @@ export default class ThuneeServer implements Party.Server {
       if (wonAllTricks) {
         this.state.teams[thuneeTeam].balls += 4
         this.state.lastBallAward = { team: thuneeTeam, amount: 4, reason: 'thunee' }
+        this.logRoundEnd(thuneeTeam, 4, 'thunee')
       } else {
         const otherTeam = thuneeTeam === 0 ? 1 : 0
         this.state.teams[otherTeam].balls += 4
         this.state.lastBallAward = { team: otherTeam, amount: 4, reason: 'thunee' }
+        this.logRoundEnd(otherTeam, 4, 'thunee')
       }
     } else {
       // Normal scoring
@@ -677,9 +709,11 @@ export default class ThuneeServer implements Party.Server {
         const ballsWon = trumpTeamCalled ? 2 : 1
         this.state.teams[countingTeam].balls += ballsWon
         this.state.lastBallAward = { team: countingTeam, amount: ballsWon, reason: 'normal' }
+        this.logRoundEnd(countingTeam, ballsWon, 'normal')
       } else {
         this.state.teams[trumpTeam].balls += 1
         this.state.lastBallAward = { team: trumpTeam, amount: 1, reason: 'normal' }
+        this.logRoundEnd(trumpTeam, 1, 'normal')
       }
     }
 
@@ -695,6 +729,15 @@ export default class ThuneeServer implements Party.Server {
       return true
     }
     return false
+  }
+
+  logRoundEnd(winningTeam: 0 | 1, ballsAwarded: number, reason: 'normal' | 'thunee' | 'challenge' | 'khanaak') {
+    this.state.eventLog.push({
+      type: 'round-end',
+      data: { winningTeam, ballsAwarded, reason },
+      roundNumber: this.state.gameRound,
+      timestamp: Date.now()
+    })
   }
 
   startSecondRound() {
@@ -925,6 +968,7 @@ export default class ThuneeServer implements Party.Server {
 
     // Award 4 balls to winning team
     this.state.teams[winningTeam].balls += 4
+    this.logRoundEnd(winningTeam, 4, 'challenge')
 
     // Check for game over
     if (!this.checkGameOver()) {
@@ -987,12 +1031,14 @@ export default class ThuneeServer implements Party.Server {
       const ballsWon = isBackward ? 6 : 3
       this.state.teams[caller.team].balls += ballsWon
       this.state.lastBallAward = { team: caller.team, amount: ballsWon, reason: 'normal' }
+      this.logRoundEnd(caller.team, ballsWon, 'khanaak')
       // Khanaak makes the game 13 balls to win
       this.state.isKhanaakGame = true
     } else {
       // Failed khanaak: opponent gets 4 balls
       this.state.teams[opponentTeam].balls += 4
       this.state.lastBallAward = { team: opponentTeam, amount: 4, reason: 'normal' }
+      this.logRoundEnd(opponentTeam, 4, 'khanaak')
     }
 
     // End the round (skip normal scoring since khanaak resolved it)

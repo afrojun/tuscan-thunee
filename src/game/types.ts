@@ -52,6 +52,7 @@ export type GameEvent =
   | { type: 'thunee-call'; data: { playerId: string }; roundNumber: number; timestamp: number }
   | { type: 'jodhi-call'; data: { playerId: string; suit: Suit; points: number; hasJack: boolean }; roundNumber: number; timestamp: number }
   | { type: 'round-start'; data: { dealerId: string }; roundNumber: number; timestamp: number }
+  | { type: 'round-end'; data: { winningTeam: 0 | 1; ballsAwarded: number; reason: 'normal' | 'thunee' | 'challenge' | 'khanaak' }; roundNumber: number; timestamp: number }
   | { type: 'khanaak-call'; data: { playerId: string; success: boolean; jodhiTotal: number; opponentPoints: number; isBackward: boolean }; roundNumber: number; timestamp: number }
 
 export interface TeamScore {
