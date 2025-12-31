@@ -19,6 +19,7 @@ interface ScoreBoardProps {
   jodhiCalls?: JodhiCall[]
   eventLog?: GameEvent[]
   trump?: Suit | null
+  isKhanaakGame?: boolean
 }
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -48,8 +49,10 @@ export function ScoreBoard({
   phase, 
   jodhiCalls = [],
   eventLog = [],
-  trump
+  trump,
+  isKhanaakGame = false
 }: ScoreBoardProps) {
+  const winThreshold = isKhanaakGame ? 13 : 12
   const [showHistory, setShowHistory] = useState(false)
   
   const team0Players = players.filter(p => p.team === 0).map(p => p.name).join(' & ')
@@ -100,7 +103,7 @@ export function ScoreBoard({
             </div>
             <div className="flex justify-between font-mono text-base sm:text-lg text-retro-black">
               <span>Balls:</span>
-              <span className="font-bold text-lg sm:text-xl">{teams[0].balls}/13</span>
+              <span className="font-bold text-lg sm:text-xl">{teams[0].balls}/{winThreshold}</span>
             </div>
             <div className="flex justify-between font-mono text-sm sm:text-base text-gray-600">
               <span>Points:</span>
@@ -119,7 +122,7 @@ export function ScoreBoard({
             </div>
             <div className="flex justify-between font-mono text-base sm:text-lg text-retro-black">
               <span>Balls:</span>
-              <span className="font-bold text-lg sm:text-xl">{teams[1].balls}/13</span>
+              <span className="font-bold text-lg sm:text-xl">{teams[1].balls}/{winThreshold}</span>
             </div>
             <div className="flex justify-between font-mono text-sm sm:text-base text-gray-600">
               <span>Points:</span>
@@ -242,6 +245,21 @@ export function ScoreBoard({
                           {SUIT_SYMBOLS[event.data.suit]}
                         </span>
                         <span className="ml-auto">+{event.data.points}</span>
+                      </div>
+                    )}
+                    
+                    {event.type === 'khanaak-call' && (
+                      <div className={`font-mono text-xs flex items-center gap-2 py-1 px-2 mb-1 rounded ${
+                        event.data.success ? 'bg-purple-300' : 'bg-retro-red/20'
+                      }`}>
+                        <span>🎯</span>
+                        <span className="font-bold">{getPlayerName(event.data.playerId)}</span>
+                        <span>{event.data.isBackward ? 'Backward ' : ''}Khanaak</span>
+                        <span className="ml-auto font-bold">
+                          {event.data.success 
+                            ? `+${event.data.isBackward ? 6 : 3}` 
+                            : 'FAILED! +4'}
+                        </span>
                       </div>
                     )}
                   </div>

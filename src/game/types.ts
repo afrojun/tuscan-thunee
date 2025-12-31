@@ -52,6 +52,7 @@ export type GameEvent =
   | { type: 'thunee-call'; data: { playerId: string }; roundNumber: number; timestamp: number }
   | { type: 'jodhi-call'; data: { playerId: string; suit: Suit; points: number; hasJack: boolean }; roundNumber: number; timestamp: number }
   | { type: 'round-start'; data: { dealerId: string }; roundNumber: number; timestamp: number }
+  | { type: 'khanaak-call'; data: { playerId: string; success: boolean; jodhiTotal: number; opponentPoints: number; isBackward: boolean }; roundNumber: number; timestamp: number }
 
 export interface TeamScore {
   balls: number
@@ -90,6 +91,9 @@ export interface GameState {
   dealerId: string | null
   dealRound: number // For 2-player mode (1 or 2)
   gameRound: number // Overall round counter (for history)
+  
+  // Khanaak makes the game require 13 balls instead of 12
+  isKhanaakGame: boolean
   
   // Bidding
   bidState: BidState
@@ -155,6 +159,7 @@ export type ClientMessage =
   | { type: 'call-thunee' }
   | { type: 'call-jodhi'; suit: Suit; withJack: boolean }
   | { type: 'call-trumpless' }
+  | { type: 'call-khanaak' }
   | { type: 'play-card'; card: Card }
   | { type: 'challenge-play'; accusedId: string }
   | { type: 'challenge-jodhi'; accusedId: string; suit: Suit }

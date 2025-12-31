@@ -158,6 +158,9 @@ export default class ThuneeServer implements Party.Server {
       case "challenge-jodhi":
         this.handleChallengeJodhi(playerId, msg.accusedId, msg.suit)
         break
+      case "call-khanaak":
+        this.handleCallKhanaak(playerId)
+        break
     }
 
     this.saveState()
@@ -677,7 +680,8 @@ export default class ThuneeServer implements Party.Server {
   }
 
   checkGameOver(): boolean {
-    if (this.state.teams[0].balls >= 13 || this.state.teams[1].balls >= 13) {
+    const winThreshold = this.state.isKhanaakGame ? 13 : 12
+    if (this.state.teams[0].balls >= winThreshold || this.state.teams[1].balls >= winThreshold) {
       this.state.phase = "game-over"
       return true
     }
@@ -914,10 +918,78 @@ export default class ThuneeServer implements Party.Server {
     this.state.teams[winningTeam].balls += 4
 
     // Check for game over
-    if (this.state.teams[0].balls >= 13 || this.state.teams[1].balls >= 13) {
-      this.state.phase = "game-over"
-    } else {
+    if (!this.checkGameOver()) {
       this.state.phase = "round-end"
+    }
+  }
+
+  handleCallKhanaak(playerId: string) {
+    // Khanaak can only be called on the last trick (trick-complete phase after 6th trick)
+    if (this.state.phase !== "trick-complete") return
+    if (this.state.tricksPlayed !== 6) return
+
+    const caller = this.state.players.find(p => p.id === playerId)
+    if (!caller) return
+
+    // Must be the player (or team) winning the last trick
+    const lastTrickWinnerId = this.state.currentTrick.winnerId
+    const lastTrickWinner = this.state.players.find(p => p.id === lastTrickWinnerId)
+    if (!lastTrickWinner || caller.team !== lastTrickWinner.team) return
+
+    // Caller's team must have a Jodhi
+    const callerTeamJodhi = this.state.jodhiCalls
+      .filter(j => {
+        const jodhiPlayer = this.state.players.find(p => p.id === j.playerId)
+        return jodhiPlayer?.team === caller.team
+      })
+      .reduce((sum, j) => sum + j.points, 0)
+
+    if (callerTeamJodhi === 0) return // Can't call Khanaak without a Jodhi
+
+    // Calculate opponent's points (already includes +10 for last trick in endRound)
+    const trumpTeam = this.state.players.find(p => p.id === this.state.trumpCallerId)?.team ?? 0
+    const isBackward = caller.team !== trumpTeam
+
+    // Opponent team's card points (before last trick bonus is applied in endRound)
+    const opponentTeam = caller.team === 0 ? 1 : 0
+    const opponentPoints = this.state.teams[opponentTeam].cardPoints
+
+    // Khanaak succeeds if opponent's card points < caller's Jodhi + 10 (last trick bonus)
+    // Note: bids and opponent jodhis are not counted in Khanaak
+    const khanaakThreshold = callerTeamJodhi + 10
+    const success = opponentPoints < khanaakThreshold
+
+    // Log the khanaak call
+    this.state.eventLog.push({
+      type: 'khanaak-call',
+      data: {
+        playerId,
+        success,
+        jodhiTotal: callerTeamJodhi,
+        opponentPoints,
+        isBackward
+      },
+      roundNumber: this.state.gameRound,
+      timestamp: Date.now()
+    })
+
+    if (success) {
+      // Award balls based on backward or forward khanaak
+      const ballsWon = isBackward ? 6 : 3
+      this.state.teams[caller.team].balls += ballsWon
+      this.state.lastBallAward = { team: caller.team, amount: ballsWon, reason: 'normal' }
+      // Khanaak makes the game 13 balls to win
+      this.state.isKhanaakGame = true
+    } else {
+      // Failed khanaak: opponent gets 4 balls
+      this.state.teams[opponentTeam].balls += 4
+      this.state.lastBallAward = { team: opponentTeam, amount: 4, reason: 'normal' }
+    }
+
+    // End the round (skip normal scoring since khanaak resolved it)
+    if (!this.checkGameOver()) {
+      this.state.phase = "round-end"
+      this.rotateDealerAndReset()
     }
   }
 }

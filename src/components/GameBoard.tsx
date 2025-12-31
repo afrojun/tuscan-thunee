@@ -109,6 +109,27 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
     return currentPlayer.team === gameState.lastTrickWinningTeam
   }
 
+  const canCallKhanaak = () => {
+    if (isSpectator || !currentPlayer) return false
+    if (gameState.phase !== 'trick-complete') return false
+    if (gameState.tricksPlayed !== 6) return false
+    
+    const lastTrickWinnerId = gameState.currentTrick.winnerId
+    const lastTrickWinner = gameState.players.find(p => p.id === lastTrickWinnerId)
+    if (!lastTrickWinner || currentPlayer.team !== lastTrickWinner.team) return false
+    
+    const myTeamJodhi = gameState.jodhiCalls.filter(j => {
+      const jodhiPlayer = gameState.players.find(p => p.id === j.playerId)
+      return jodhiPlayer?.team === currentPlayer.team
+    }).reduce((sum, j) => sum + j.points, 0)
+    
+    return myTeamJodhi > 0
+  }
+
+  const handleCallKhanaak = () => {
+    onAction({ type: 'call-khanaak' })
+  }
+
   const myCalledJodhiSuits = gameState.jodhiCalls
     .filter(j => j.playerId === playerId)
     .map(j => j.suit)
@@ -160,6 +181,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         jodhiCalls={gameState.jodhiCalls}
         eventLog={gameState.eventLog}
         trump={gameState.trump}
+        isKhanaakGame={gameState.isKhanaakGame}
       />
 
       {/* Top opponent (partner in 4p, opponent in 2p) */}
@@ -308,6 +330,16 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
                   onCallJodhi={handleCallJodhi}
                   disabled={false}
                 />
+              )}
+
+              {/* Khanaak button - only on last trick for team with jodhi winning */}
+              {canCallKhanaak() && (
+                <button
+                  onClick={handleCallKhanaak}
+                  className="btn-retro text-xs bg-purple-600 hover:bg-purple-700 text-white border-purple-800"
+                >
+                  🎯 KHANAAK
+                </button>
               )}
 
               {/* Challenge button */}
