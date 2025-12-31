@@ -238,6 +238,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         trumpRevealed={gameState.trumpRevealed}
         isKhanaakGame={gameState.isKhanaakGame}
         historyUnlocked={historyUnlocked}
+        gameRound={gameState.gameRound}
       />
 
       {/* Top opponent (partner in 4p, opponent in 2p) */}
@@ -398,13 +399,13 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
                 </button>
               )}
 
-              {/* Challenge button */}
+              {/* 4-Ball button */}
               {opponents.length > 0 && (
                 <button
                   onClick={() => setShowChallengeModal(true)}
                   className="btn-danger text-xs"
                 >
-                  ⚡ CHALLENGE
+                  ⚡ 4-BALL
                 </button>
               )}
             </div>

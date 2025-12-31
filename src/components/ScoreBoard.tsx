@@ -22,6 +22,7 @@ interface ScoreBoardProps {
   trumpRevealed?: boolean
   isKhanaakGame?: boolean
   historyUnlocked?: boolean
+  gameRound?: number
 }
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -54,7 +55,8 @@ export function ScoreBoard({
   trump,
   trumpRevealed = false,
   isKhanaakGame = false,
-  historyUnlocked = false
+  historyUnlocked = false,
+  gameRound = 1
 }: ScoreBoardProps) {
   const winThreshold = isKhanaakGame ? 13 : 12
   const [showHistory, setShowHistory] = useState(false)
@@ -72,6 +74,18 @@ export function ScoreBoard({
   
   const team0Jodhis = getTeamJodhis(0)
   const team1Jodhis = getTeamJodhis(1)
+
+  // Count tricks won per team in current round
+  const getTeamTricksWon = (team: 0 | 1) => {
+    return eventLog.filter(e => {
+      if (e.type !== 'trick' || e.roundNumber !== gameRound) return false
+      const winner = players.find(p => p.id === e.data.winnerId)
+      return winner?.team === team
+    }).length
+  }
+
+  const team0Tricks = getTeamTricksWon(0)
+  const team1Tricks = getTeamTricksWon(1)
 
   const getPlayerName = (playerId: string) => {
     return players.find(p => p.id === playerId)?.name ?? '?'
@@ -110,8 +124,8 @@ export function ScoreBoard({
               <span className="font-bold text-lg sm:text-xl">{teams[0].balls}/{winThreshold}</span>
             </div>
             <div className="flex justify-between font-mono text-sm sm:text-base text-gray-600">
-              <span>Points:</span>
-              <span>{teams[0].cardPoints}</span>
+              <span>Hands:</span>
+              <span>{team0Tricks}</span>
             </div>
             {team0Jodhis.length > 0 && (
               <div className="font-mono text-xs text-retro-gold">
@@ -129,8 +143,8 @@ export function ScoreBoard({
               <span className="font-bold text-lg sm:text-xl">{teams[1].balls}/{winThreshold}</span>
             </div>
             <div className="flex justify-between font-mono text-sm sm:text-base text-gray-600">
-              <span>Points:</span>
-              <span>{teams[1].cardPoints}</span>
+              <span>Hands:</span>
+              <span>{team1Tricks}</span>
             </div>
             {team1Jodhis.length > 0 && (
               <div className="font-mono text-xs text-retro-gold">
