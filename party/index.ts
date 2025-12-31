@@ -973,6 +973,7 @@ export default class ThuneeServer implements Party.Server {
     // Check for game over
     if (!this.checkGameOver()) {
       this.state.phase = "round-end"
+      this.rotateDealerAndReset()
     }
   }
 
