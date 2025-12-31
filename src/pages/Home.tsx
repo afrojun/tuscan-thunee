@@ -28,25 +28,23 @@ export function Home() {
       <div className="card-container p-6 w-full max-w-sm space-y-6">
         <div className="space-y-3">
           <h2 className="font-retro text-xs text-retro-black">CREATE GAME</h2>
-          
+
           <div className="flex gap-2">
             <button
               onClick={() => setPlayerCount(2)}
-              className={`flex-1 py-2 border-2 border-retro-black font-retro text-xs transition-colors ${
-                playerCount === 2 
-                  ? 'bg-retro-black text-retro-cream' 
+              className={`flex-1 py-2 border-2 border-retro-black font-retro text-xs transition-colors ${playerCount === 2
+                  ? 'bg-retro-black text-retro-cream'
                   : 'bg-retro-cream text-retro-black'
-              }`}
+                }`}
             >
               2P
             </button>
             <button
               onClick={() => setPlayerCount(4)}
-              className={`flex-1 py-2 border-2 border-retro-black font-retro text-xs transition-colors ${
-                playerCount === 4 
-                  ? 'bg-retro-black text-retro-cream' 
+              className={`flex-1 py-2 border-2 border-retro-black font-retro text-xs transition-colors ${playerCount === 4
+                  ? 'bg-retro-black text-retro-cream'
                   : 'bg-retro-cream text-retro-black'
-              }`}
+                }`}
             >
               4P
             </button>
@@ -59,7 +57,7 @@ export function Home() {
 
         <div className="border-t-2 border-retro-black pt-6 space-y-3">
           <h2 className="font-retro text-xs text-retro-black">JOIN GAME</h2>
-          
+
           <form onSubmit={handleJoin} className="space-y-3">
             <input
               type="text"
@@ -70,8 +68,8 @@ export function Home() {
                          border-2 border-retro-black text-center tracking-widest
                          placeholder:text-gray-400 placeholder:tracking-normal placeholder:text-sm"
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn-retro w-full"
               disabled={joinCode.length !== 6}
             >
@@ -82,7 +80,7 @@ export function Home() {
       </div>
 
       <p className="font-mono text-xs text-retro-cream/60 text-center">
-        A South African card game
+        Made for Charous, by Charous
       </p>
     </div>
   )
