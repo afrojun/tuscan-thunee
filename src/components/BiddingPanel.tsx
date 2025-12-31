@@ -34,6 +34,7 @@ export function BiddingPanel({
   const isDefaultTrumper = playerId === bidState.defaultTrumperId
   const someoneHasCalled = bidState.currentBid > 0
   const timerRunning = bidState.timerEndsAt !== null
+  const isCurrentBidder = playerId === bidState.bidderId
 
   // Update selected bid when min changes
   useEffect(() => {
@@ -124,6 +125,52 @@ export function BiddingPanel({
             ))}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Current bidder (after calling) - show trump preselection while others can counter
+  if (isCurrentBidder && someoneHasCalled) {
+    return (
+      <div className="card-container p-4 space-y-3 w-full max-w-xs">
+        {/* Timer */}
+        {timerRunning && (
+          <div className="text-center">
+            <div className={`font-retro text-2xl ${timeLeft <= 3 ? 'text-retro-red animate-pulse' : 'text-retro-black'}`}>
+              {timeLeft}s
+            </div>
+          </div>
+        )}
+
+        <div className="text-center">
+          <p className="font-retro text-xs text-retro-black">YOU CALLED {bidState.currentBid}</p>
+          <p className="font-mono text-[10px] text-gray-500 mt-1">
+            Select trump while waiting for counter-calls
+          </p>
+        </div>
+
+        {/* Trump selection */}
+        <div className="grid grid-cols-4 gap-2">
+          {SUITS.map(({ suit, symbol, color }) => (
+            <button
+              key={suit}
+              onClick={() => onPreselectTrump(suit)}
+              className={`py-3 text-2xl border-2 border-retro-black 
+                         ${bidState.preSelectedTrump === suit 
+                           ? 'bg-retro-gold' 
+                           : 'bg-retro-cream hover:bg-gray-100'} 
+                         ${color}`}
+            >
+              {symbol}
+            </button>
+          ))}
+        </div>
+
+        {bidState.preSelectedTrump && (
+          <p className="font-mono text-xs text-center text-gray-600">
+            {SUITS.find(s => s.suit === bidState.preSelectedTrump)?.symbol} selected - waiting for timer...
+          </p>
+        )}
       </div>
     )
   }

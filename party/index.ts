@@ -369,10 +369,16 @@ export default class ThuneeServer implements Party.Server {
 
   handlePreselectTrump(playerId: string, suit: Suit) {
     if (this.state.phase !== "bidding") return
-    // Only default trumper can preselect
-    if (playerId !== this.state.bidState.defaultTrumperId) return
-    // Can't preselect if someone has already called
-    if (this.state.bidState.currentBid > 0) return
+    
+    const someoneHasCalled = this.state.bidState.currentBid > 0
+    
+    if (someoneHasCalled) {
+      // Only current bidder can preselect after a call
+      if (playerId !== this.state.bidState.bidderId) return
+    } else {
+      // Only default trumper can preselect before any calls
+      if (playerId !== this.state.bidState.defaultTrumperId) return
+    }
 
     this.state.bidState.preSelectedTrump = suit
   }
