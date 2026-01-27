@@ -1,6 +1,13 @@
-export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades'
+// Import Suit from the generic card library
+import type { Suit } from '@/lib/cards'
+
+// Re-export Suit for consumers of this module
+export type { Suit }
+
+// Thunee-specific rank ordering (J highest, Q lowest)
 export type Rank = 'J' | '9' | 'A' | '10' | 'K' | 'Q'
 
+// Card type for Thunee
 export interface Card {
   suit: Suit
   rank: Rank

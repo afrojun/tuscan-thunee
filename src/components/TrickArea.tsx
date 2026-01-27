@@ -1,4 +1,4 @@
-import { Card } from './Card'
+import { Card } from '@/lib/cards'
 import { FloatingScore } from './FloatingScore'
 import type { Trick, Player } from '@/game/types'
 import { CARD_VALUES } from '@/game/types'

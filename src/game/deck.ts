@@ -1,74 +1,62 @@
-import type { Card, Suit, Rank } from './types'
+import type { Card, Rank } from './types'
+import { 
+  createDeck as createGenericDeck, 
+  shuffle, 
+  cardEquals as genericCardEquals,
+  cardToString as genericCardToString
+} from '@/lib/cards'
 
-const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades']
-const RANKS: Rank[] = ['J', '9', 'A', '10', 'K', 'Q']
+// Thunee uses a 24-card deck (6 ranks × 4 suits)
+const THUNEE_RANKS: Rank[] = ['J', '9', 'A', '10', 'K', 'Q']
 
+/**
+ * Create a standard 24-card Thunee deck.
+ */
 export function createDeck(): Card[] {
-  const deck: Card[] = []
-  for (const suit of SUITS) {
-    for (const rank of RANKS) {
-      deck.push({ suit, rank })
-    }
-  }
-  return deck
+  return createGenericDeck(THUNEE_RANKS)
 }
 
+/**
+ * Shuffle a deck using Fisher-Yates algorithm.
+ */
 export function shuffleDeck(deck: Card[]): Card[] {
-  const shuffled = [...deck]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  return shuffled
+  return shuffle(deck)
 }
 
+/**
+ * Deal cards to players in Thunee format.
+ * - 4 players: 4 cards first phase, 2 cards second phase
+ * - 2 players: 4 cards first phase, 2 cards second phase (per round)
+ */
 export function dealCards(
   deck: Card[],
   playerCount: 2 | 4,
   phase: 'first' | 'second'
 ): Card[][] {
-  if (playerCount === 4) {
-    // 4 players: 4 cards first, then 2 cards
-    const cardsPerPlayer = phase === 'first' ? 4 : 2
-    const hands: Card[][] = [[], [], [], []]
-    
-    for (let i = 0; i < cardsPerPlayer; i++) {
-      for (let p = 0; p < 4; p++) {
-        const cardIndex = i * 4 + p
-        if (deck[cardIndex]) {
-          hands[p].push(deck[cardIndex])
-        }
+  const cardsPerPlayer = phase === 'first' ? 4 : 2
+  const hands: Card[][] = Array.from({ length: playerCount }, () => [])
+  
+  for (let i = 0; i < cardsPerPlayer; i++) {
+    for (let p = 0; p < playerCount; p++) {
+      const cardIndex = i * playerCount + p
+      if (deck[cardIndex]) {
+        hands[p].push(deck[cardIndex])
       }
     }
-    return hands
-  } else {
-    // 2 players: each gets 12 cards total, played in 2 rounds
-    // Each round: 4 cards first, then 2 cards (like 4-player)
-    const cardsPerPlayer = phase === 'first' ? 4 : 2
-    const hands: Card[][] = [[], []]
-    
-    for (let i = 0; i < cardsPerPlayer; i++) {
-      for (let p = 0; p < 2; p++) {
-        const cardIndex = i * 2 + p
-        if (deck[cardIndex]) {
-          hands[p].push(deck[cardIndex])
-        }
-      }
-    }
-    return hands
   }
+  return hands
 }
 
+/**
+ * Check if two cards are equal.
+ */
 export function cardEquals(a: Card, b: Card): boolean {
-  return a.suit === b.suit && a.rank === b.rank
+  return genericCardEquals(a, b)
 }
 
+/**
+ * Convert a card to display string (e.g., "J♠").
+ */
 export function cardToString(card: Card): string {
-  const suitSymbols: Record<Suit, string> = {
-    hearts: '♥',
-    diamonds: '♦',
-    clubs: '♣',
-    spades: '♠',
-  }
-  return `${card.rank}${suitSymbols[card.suit]}`
+  return genericCardToString(card)
 }

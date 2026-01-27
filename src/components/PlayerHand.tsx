@@ -1,4 +1,4 @@
-import { Card } from './Card'
+import { Card } from '@/lib/cards'
 import type { Card as CardType } from '@/game/types'
 
 interface PlayerHandProps {

@@ -1,26 +1,21 @@
-import type { Card as CardType, Suit } from '@/game/types'
+import type { Suit } from './types'
+import { SUIT_SYMBOLS } from './types'
+
+const SUIT_CSS_COLORS: Record<Suit, string> = {
+  hearts: 'text-red-600',
+  diamonds: 'text-red-600',
+  clubs: 'text-gray-900',
+  spades: 'text-gray-900',
+}
 
 interface CardProps {
-  card: CardType
+  /** Any card object with suit and rank */
+  card: { suit: Suit; rank: string }
   onClick?: () => void
   disabled?: boolean
   selected?: boolean
   faceDown?: boolean
   small?: boolean
-}
-
-const SUIT_SYMBOLS: Record<Suit, string> = {
-  hearts: '♥',
-  diamonds: '♦',
-  clubs: '♣',
-  spades: '♠',
-}
-
-const SUIT_COLORS: Record<Suit, string> = {
-  hearts: 'text-red-600',
-  diamonds: 'text-red-600',
-  clubs: 'text-gray-900',
-  spades: 'text-gray-900',
 }
 
 export function Card({ 
@@ -58,7 +53,7 @@ export function Card({
           ? 'hover:-translate-y-3 hover:scale-105 hover:shadow-xl hover:border-retro-gold/50 cursor-pointer active:scale-95' 
           : 'cursor-default'}
         ${selected ? '-translate-y-3 ring-2 ring-retro-gold' : ''}
-        ${SUIT_COLORS[card.suit]}
+        ${SUIT_CSS_COLORS[card.suit]}
       `}
     >
       <span className={`font-bold leading-none ${small ? 'text-xl' : 'text-3xl sm:text-4xl'}`}>

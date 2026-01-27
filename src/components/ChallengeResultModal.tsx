@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { Card as CardType, Player, Suit } from '@/game/types'
-import { Card } from './Card'
+import { Card } from '@/lib/cards'
 
 interface ChallengeResult {
   challengerId: string

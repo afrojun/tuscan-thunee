@@ -1,15 +1,5 @@
-export function generateGameCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Exclude confusing chars: I, O, 0, 1
-  let code = ''
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return code
-}
-
-export function generatePlayerId(): string {
-  return crypto.randomUUID()
-}
+// Re-export generic utilities from lib
+export { generateGameCode, generatePlayerId } from '@/lib/utils'
 
 export function getTeamForPlayer(playerIndex: number): 0 | 1 {
   // Players 0 and 2 are team 0, players 1 and 3 are team 1
