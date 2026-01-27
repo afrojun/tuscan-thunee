@@ -34,6 +34,12 @@ import {
 import { getTrickEvents, CALL_TIMER_MS, TRICK_DISPLAY_MS } from "./helpers"
 import { handleJoin as handleJoinLogic, canStart } from "./handlers/lobby"
 import { handleSetTrump as handleSetTrumpLogic, handleCallThunee as handleCallThuneeLogic } from "./handlers/calling"
+import { 
+  handleBid as handleBidLogic, 
+  handlePass as handlePassLogic, 
+  handlePreselectTrump as handlePreselectTrumpLogic,
+  handleTimerExpired as handleTimerExpiredLogic
+} from "./handlers/bidding"
 
 interface ConnectionState {
   playerId: string
@@ -338,131 +344,28 @@ export default class ThuneeServer implements Party.Server {
 
   onCallTimerExpired() {
     if (this.state.phase !== "bidding") return
-
-    this.state.bidState.timerEndsAt = null
-
-    const noCalls = this.state.bidState.currentBid === 0
-
-    if (noCalls) {
-      // No one called - default trumper sets trump
-      this.state.trumpCallerId = this.state.bidState.defaultTrumperId
-      this.state.bidState.bidderId = null
-
-      // If trumper pre-selected, use that trump directly
-      if (this.state.bidState.preSelectedTrump) {
-        this.state.trump = this.state.bidState.preSelectedTrump
-        this.endBidding()
-        // Skip calling phase, go straight to playing
-        const trumperIndex = this.state.players.findIndex(p => p.id === this.state.trumpCallerId)
-        const leaderIndex = (trumperIndex + this.state.playerCount - 1) % this.state.playerCount
-        this.state.currentPlayerId = this.state.players[leaderIndex].id
-        this.state.phase = "playing"
-      } else {
-        // Trumper didn't preselect - go to calling phase for them to choose
-        this.endBidding()
-      }
-    } else {
-      // Someone called and timer expired - highest bidder wins
-      this.state.trumpCallerId = this.state.bidState.bidderId
-      this.endBidding()
-    }
-
+    handleTimerExpiredLogic(this.state)
     this.saveState()
     this.broadcastState()
   }
 
   handleBid(playerId: string, amount: number) {
-    if (this.state.phase !== "bidding") return
-
-    // Check if player has passed
-    if (this.state.bidState.passed.has(playerId)) return
-
-    // Validate bid amount
-    if (amount <= this.state.bidState.currentBid) return
-    if (amount > 104) return
-    if (amount % 10 !== 0 && amount !== 104) return
-
-    this.state.bidState.currentBid = amount
-    this.state.bidState.bidderId = playerId
-
-    // Clear any pre-selected trump - bidding war invalidates it
-    this.state.bidState.preSelectedTrump = null
-
-    // Start/reset timer for others to counter-call
-    this.startCallTimer()
+    const result = handleBidLogic(this.state, playerId, amount)
+    if (result.success) {
+      this.startCallTimer()
+    }
   }
 
   async handlePass(playerId: string) {
-    if (this.state.phase !== "bidding") return
-    // Only relevant if timer is running (someone called)
-    if (!this.state.bidState.timerEndsAt) return
-
-    // Can't pass twice
-    if (this.state.bidState.passed.has(playerId)) return
-
-    this.state.bidState.passed.add(playerId)
-
-    // Check if all OTHER players have passed (bidder doesn't need to pass)
-    const otherPlayers = this.state.players.filter(p => p.id !== this.state.bidState.bidderId)
-    const allOthersPassed = otherPlayers.every(p => this.state.bidState.passed.has(p.id))
-    if (allOthersPassed) {
-      // End immediately - delete the alarm
+    const result = handlePassLogic(this.state, playerId)
+    if (result.success && result.allPassed) {
       await this.room.storage.deleteAlarm()
       this.onCallTimerExpired()
     }
   }
 
   handlePreselectTrump(playerId: string, suit: Suit) {
-    if (this.state.phase !== "bidding") return
-    
-    const someoneHasCalled = this.state.bidState.currentBid > 0
-    
-    if (someoneHasCalled) {
-      // Only current bidder can preselect after a call
-      if (playerId !== this.state.bidState.bidderId) return
-    } else {
-      // Only default trumper can preselect before any calls
-      if (playerId !== this.state.bidState.defaultTrumperId) return
-    }
-
-    this.state.bidState.preSelectedTrump = suit
-  }
-
-  endBidding() {
-    // Deal remaining 2 cards to complete hand of 6
-    if (this.state.playerCount === 4) {
-      // 4-player: cards 16-23 (2 per player)
-      const startIndex = 16
-      for (let i = 0; i < 4; i++) {
-        const card1 = this.state.deck[startIndex + i * 2]
-        const card2 = this.state.deck[startIndex + i * 2 + 1]
-        if (card1) this.state.players[i].hand.push(card1)
-        if (card2) this.state.players[i].hand.push(card2)
-      }
-    } else {
-      // 2-player: cards 8-11 (2 per player)
-      // Player 0: cards 8, 9; Player 1: cards 10, 11
-      for (let i = 0; i < 2; i++) {
-        const card1 = this.state.deck[8 + i * 2]
-        const card2 = this.state.deck[8 + i * 2 + 1]
-        if (card1) this.state.players[i].hand.push(card1)
-        if (card2) this.state.players[i].hand.push(card2)
-      }
-    }
-
-    if (this.state.bidState.bidderId) {
-      // Winner of bid sets trump
-      this.state.trumpCallerId = this.state.bidState.bidderId
-      this.state.currentPlayerId = this.state.bidState.bidderId
-    } else {
-      // No one bid - dealer's RHO sets trump
-      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-      const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
-      this.state.trumpCallerId = this.state.players[rhoIndex].id
-      this.state.currentPlayerId = this.state.players[rhoIndex].id
-    }
-
-    this.state.phase = "calling"
+    handlePreselectTrumpLogic(this.state, playerId, suit)
   }
 
   handleSetTrump(playerId: string, suit: Suit, lastCard?: boolean) {
