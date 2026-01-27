@@ -48,9 +48,20 @@ import {
 import {
   evaluatePlayChallenge,
   evaluateJodhiChallenge,
-  applyChallengeResult,
-  getPlayerCardsPlayed
+  applyChallengeResult
 } from "./handlers/challenge"
+import {
+  calculateTeamJodhiPoints,
+  evaluateThunee,
+  calculateNormalScoring,
+  awardLastTrickBonus,
+  logRoundEnd,
+  checkGameOver as checkGameOverLogic,
+  rotateDealerAndReset as rotateDealerAndResetLogic,
+  setupSecondRound,
+  evaluateKhanaak,
+  applyKhanaakResult
+} from "./handlers/round"
 
 interface ConnectionState {
   playerId: string
@@ -409,107 +420,42 @@ export default class ThuneeServer implements Party.Server {
 
   endRound() {
     const trickEvents = getTrickEvents(this.state.eventLog)
+    awardLastTrickBonus(this.state)
 
-    // Award 10 points for last trick
-    const lastTrick = trickEvents[trickEvents.length - 1]
-    if (lastTrick?.winnerId) {
-      const lastWinner = this.state.players.find(p => p.id === lastTrick.winnerId)
-      if (lastWinner) {
-        this.state.teams[lastWinner.team].cardPoints += 10
-      }
-    }
-
-    // 2-player mode: check for Thunee in Round 1 (resolves immediately)
+    // 2-player mode: check for Thunee in Round 1
     if (this.state.playerCount === 2 && this.state.dealRound === 1 && this.state.thuneeCallerId) {
-      const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
-      const thuneeTeam = thuneePlayer.team
-
-      const wonAllTricks = trickEvents.every(t => {
-        const winner = this.state.players.find(p => p.id === t.winnerId)
-        return winner?.team === thuneeTeam
-      })
-
-      if (wonAllTricks) {
-        this.state.teams[thuneeTeam].balls += 4
-        this.state.lastBallAward = { team: thuneeTeam, amount: 4, reason: 'thunee' }
-        this.logRoundEnd(thuneeTeam, 4, 'thunee')
-      } else {
-        const otherTeam = thuneeTeam === 0 ? 1 : 0
-        this.state.teams[otherTeam].balls += 4
-        this.state.lastBallAward = { team: otherTeam, amount: 4, reason: 'thunee' }
-        this.logRoundEnd(otherTeam, 4, 'thunee')
+      const thuneeResult = evaluateThunee(this.state, trickEvents)
+      if (thuneeResult) {
+        this.state.teams[thuneeResult.winningTeam].balls += 4
+        this.state.lastBallAward = { team: thuneeResult.winningTeam, amount: 4, reason: 'thunee' }
+        logRoundEnd(this.state, thuneeResult.winningTeam, 4, 'thunee')
       }
-
       if (this.checkGameOver()) return
       this.state.phase = "round-end"
       this.rotateDealerAndReset()
       return
     }
 
-    // 2-player mode: after Round 1 (no Thunee), go to Round 2 without awarding balls
+    // 2-player mode: after Round 1 (no Thunee), go to Round 2
     if (this.state.playerCount === 2 && this.state.dealRound === 1) {
       this.state.dealRound = 2
-      this.startSecondRound()
+      setupSecondRound(this.state)
       return
     }
 
     // Award balls (after Round 2 in 2-player, or after 6 tricks in 4-player)
-    const trumpTeam = this.state.players.find(p => p.id === this.state.trumpCallerId)?.team ?? 0
-    const countingTeam = trumpTeam === 0 ? 1 : 0
-
-    // Calculate Jodhi points by team
-    let trumpTeamJodhi = 0
-    let countingTeamJodhi = 0
-
-    for (const jodhi of this.state.jodhiCalls) {
-      const jodhiPlayer = this.state.players.find(p => p.id === jodhi.playerId)
-      if (jodhiPlayer?.team === trumpTeam) {
-        trumpTeamJodhi += jodhi.points
-      } else {
-        countingTeamJodhi += jodhi.points
-      }
-    }
-
-    // Adjusted target and score with Jodhi
-    const target = 105 - this.state.bidState.currentBid + trumpTeamJodhi
-    const countingScore = this.state.teams[countingTeam].cardPoints + countingTeamJodhi
-
-    if (this.state.thuneeCallerId) {
-      // Thunee in 4-player mode or Round 2 of 2-player
-      const thuneePlayer = this.state.players.find(p => p.id === this.state.thuneeCallerId)!
-      const thuneeTeam = thuneePlayer.team
-
-      // For 2-player Round 2, check all 12 tricks
-      const wonAllTricks = trickEvents.every(t => {
-        const winner = this.state.players.find(p => p.id === t.winnerId)
-        return winner?.team === thuneeTeam
-      })
-
-      if (wonAllTricks) {
-        this.state.teams[thuneeTeam].balls += 4
-        this.state.lastBallAward = { team: thuneeTeam, amount: 4, reason: 'thunee' }
-        this.logRoundEnd(thuneeTeam, 4, 'thunee')
-      } else {
-        const otherTeam = thuneeTeam === 0 ? 1 : 0
-        this.state.teams[otherTeam].balls += 4
-        this.state.lastBallAward = { team: otherTeam, amount: 4, reason: 'thunee' }
-        this.logRoundEnd(otherTeam, 4, 'thunee')
-      }
+    const thuneeResult = evaluateThunee(this.state, trickEvents)
+    
+    if (thuneeResult) {
+      this.state.teams[thuneeResult.winningTeam].balls += 4
+      this.state.lastBallAward = { team: thuneeResult.winningTeam, amount: 4, reason: 'thunee' }
+      logRoundEnd(this.state, thuneeResult.winningTeam, 4, 'thunee')
     } else {
-      // Normal scoring
-      // "Call and lost": if trump team called (bid > 0) and loses, counting team gets 2 balls
-      const trumpTeamCalled = this.state.bidState.currentBid > 0
-      
-      if (countingScore >= target) {
-        const ballsWon = trumpTeamCalled ? 2 : 1
-        this.state.teams[countingTeam].balls += ballsWon
-        this.state.lastBallAward = { team: countingTeam, amount: ballsWon, reason: 'normal' }
-        this.logRoundEnd(countingTeam, ballsWon, 'normal')
-      } else {
-        this.state.teams[trumpTeam].balls += 1
-        this.state.lastBallAward = { team: trumpTeam, amount: 1, reason: 'normal' }
-        this.logRoundEnd(trumpTeam, 1, 'normal')
-      }
+      const { trumpTeamJodhi, countingTeamJodhi } = calculateTeamJodhiPoints(this.state)
+      const scoringResult = calculateNormalScoring(this.state, trumpTeamJodhi, countingTeamJodhi)
+      this.state.teams[scoringResult.winningTeam].balls += scoringResult.ballsWon
+      this.state.lastBallAward = { team: scoringResult.winningTeam, amount: scoringResult.ballsWon, reason: 'normal' }
+      logRoundEnd(this.state, scoringResult.winningTeam, scoringResult.ballsWon, 'normal')
     }
 
     if (this.checkGameOver()) return
@@ -518,61 +464,11 @@ export default class ThuneeServer implements Party.Server {
   }
 
   checkGameOver(): boolean {
-    const winThreshold = this.state.isKhanaakGame ? 13 : 12
-    if (this.state.teams[0].balls >= winThreshold || this.state.teams[1].balls >= winThreshold) {
-      this.state.phase = "game-over"
-      return true
-    }
-    return false
-  }
-
-  logRoundEnd(winningTeam: 0 | 1, ballsAwarded: number, reason: 'normal' | 'thunee' | 'challenge' | 'khanaak') {
-    this.state.eventLog.push({
-      type: 'round-end',
-      data: { winningTeam, ballsAwarded, reason },
-      roundNumber: this.state.gameRound,
-      timestamp: Date.now()
-    })
-  }
-
-  startSecondRound() {
-    // Deal remaining 12 cards (6 to each player)
-    // Player 0 gets cards 12-17, Player 1 gets cards 18-23
-    for (let i = 0; i < 2; i++) {
-      this.state.players[i].hand = []
-      for (let j = 0; j < 6; j++) {
-        this.state.players[i].hand.push(this.state.deck[12 + i * 6 + j])
-      }
-    }
-
-    // Skip directly to playing - trump and bid carry over
-    this.state.phase = "playing"
-    this.state.currentTrick = createEmptyTrick()
-    this.state.tricksPlayed = 0
-    // Don't reset eventLog - need full history for cumulative scoring
-
-    // Winner of last trick from Round 1 leads
-    const trickEvents = getTrickEvents(this.state.eventLog)
-    const lastTrick = trickEvents[trickEvents.length - 1]
-    if (lastTrick?.winnerId) {
-      this.state.currentPlayerId = lastTrick.winnerId
-    } else {
-      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-      this.state.currentPlayerId = this.state.players[(dealerIndex + 1) % 2].id
-    }
+    return checkGameOverLogic(this.state)
   }
 
   rotateDealerAndReset() {
-    const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-    const nextDealerIndex = getNextPlayerIndex(dealerIndex, this.state.playerCount)
-    this.state.dealerId = this.state.players[nextDealerIndex].id
-
-    // Reset for next deal (but keep phase as round-end so players can see summary)
-    this.state.teams[0].cardPoints = 0
-    this.state.teams[1].cardPoints = 0
-    this.state.dealRound = 1
-    this.state.gameRound++  // Increment overall round counter
-    // Phase stays as "round-end" - handleStart will set it to dealing
+    rotateDealerAndResetLogic(this.state)
   }
 
   handleChallengePlay(challengerId: string, accusedId: string) {
@@ -606,71 +502,11 @@ export default class ThuneeServer implements Party.Server {
   }
 
   handleCallKhanaak(playerId: string) {
-    // Khanaak can only be called on the last trick (trick-complete phase after 6th trick)
-    if (this.state.phase !== "trick-complete") return
-    if (this.state.tricksPlayed !== 6) return
+    const result = evaluateKhanaak(this.state, playerId)
+    if (!result.valid) return
 
-    const caller = this.state.players.find(p => p.id === playerId)
-    if (!caller) return
+    applyKhanaakResult(this.state, playerId, result)
 
-    // Must be the player (or team) winning the last trick
-    const lastTrickWinnerId = this.state.currentTrick.winnerId
-    const lastTrickWinner = this.state.players.find(p => p.id === lastTrickWinnerId)
-    if (!lastTrickWinner || caller.team !== lastTrickWinner.team) return
-
-    // Caller's team must have a Jodhi
-    const callerTeamJodhi = this.state.jodhiCalls
-      .filter(j => {
-        const jodhiPlayer = this.state.players.find(p => p.id === j.playerId)
-        return jodhiPlayer?.team === caller.team
-      })
-      .reduce((sum, j) => sum + j.points, 0)
-
-    if (callerTeamJodhi === 0) return // Can't call Khanaak without a Jodhi
-
-    // Calculate opponent's points (already includes +10 for last trick in endRound)
-    const trumpTeam = this.state.players.find(p => p.id === this.state.trumpCallerId)?.team ?? 0
-    const isBackward = caller.team !== trumpTeam
-
-    // Opponent team's card points (before last trick bonus is applied in endRound)
-    const opponentTeam = caller.team === 0 ? 1 : 0
-    const opponentPoints = this.state.teams[opponentTeam].cardPoints
-
-    // Khanaak succeeds if opponent's card points < caller's Jodhi + 10 (last trick bonus)
-    // Note: bids and opponent jodhis are not counted in Khanaak
-    const khanaakThreshold = callerTeamJodhi + 10
-    const success = opponentPoints < khanaakThreshold
-
-    // Log the khanaak call
-    this.state.eventLog.push({
-      type: 'khanaak-call',
-      data: {
-        playerId,
-        success,
-        jodhiTotal: callerTeamJodhi,
-        opponentPoints,
-        isBackward
-      },
-      roundNumber: this.state.gameRound,
-      timestamp: Date.now()
-    })
-
-    if (success) {
-      // Award balls based on backward or forward khanaak
-      const ballsWon = isBackward ? 6 : 3
-      this.state.teams[caller.team].balls += ballsWon
-      this.state.lastBallAward = { team: caller.team, amount: ballsWon, reason: 'normal' }
-      this.logRoundEnd(caller.team, ballsWon, 'khanaak')
-      // Khanaak makes the game 13 balls to win
-      this.state.isKhanaakGame = true
-    } else {
-      // Failed khanaak: opponent gets 4 balls
-      this.state.teams[opponentTeam].balls += 4
-      this.state.lastBallAward = { team: opponentTeam, amount: 4, reason: 'normal' }
-      this.logRoundEnd(opponentTeam, 4, 'khanaak')
-    }
-
-    // End the round (skip normal scoring since khanaak resolved it)
     if (!this.checkGameOver()) {
       this.state.phase = "round-end"
       this.rotateDealerAndReset()
