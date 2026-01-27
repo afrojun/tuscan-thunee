@@ -77,6 +77,30 @@ export default class ThuneeServer implements Party.Server {
     await this.room.storage.put("state", serializeState(this.state))
   }
 
+  /**
+   * Filter game state for a specific player.
+   * Hides other players' hands to prevent cheating via WebSocket inspection.
+   */
+  getStateForPlayer(playerId: string): GameState {
+    return {
+      ...this.state,
+      players: this.state.players.map(p => {
+        // Only show your own hand
+        if (p.id === playerId) {
+          return p
+        }
+        
+        // Hide all other hands - only show card count via placeholder cards
+        return {
+          ...p,
+          hand: Array(p.hand.length).fill({ suit: 'spades', rank: 'Q' } as Card)
+        }
+      }),
+      // Hide the deck (used in 2-player mode)
+      deck: [],
+    }
+  }
+
   broadcast(msg: ServerMessage, exclude?: string) {
     for (const conn of this.room.getConnections()) {
       if (exclude && conn.id === exclude) continue
@@ -92,8 +116,21 @@ export default class ThuneeServer implements Party.Server {
     conn.send(JSON.stringify({ ...msg, playerId }))
   }
 
+  /**
+   * Broadcast state to all players, filtering each player's view.
+   */
   broadcastState() {
-    this.broadcast({ type: "state", state: this.state, playerId: "" })
+    for (const conn of this.room.getConnections()) {
+      const playerId = this.connectionPlayerMap.get(conn.id)
+      if (playerId) {
+        const filteredState = this.getStateForPlayer(playerId)
+        conn.send(JSON.stringify({ 
+          type: "state", 
+          state: filteredState, 
+          playerId 
+        }))
+      }
+    }
   }
 
   onConnect(conn: Party.Connection) {
@@ -101,10 +138,11 @@ export default class ThuneeServer implements Party.Server {
     const playerId = crypto.randomUUID()
     this.connectionPlayerMap.set(conn.id, playerId)
 
-    // Send current state immediately
+    // Send current state immediately (filtered for this player)
+    const filteredState = this.getStateForPlayer(playerId)
     conn.send(JSON.stringify({
       type: "state",
-      state: this.state,
+      state: filteredState,
       playerId
     }))
   }
@@ -122,7 +160,20 @@ export default class ThuneeServer implements Party.Server {
   }
 
   onMessage(message: string, sender: Party.Connection) {
-    const msg = JSON.parse(message) as ClientMessage
+    // Validate and parse incoming message
+    let msg: ClientMessage
+    try {
+      const parsed = JSON.parse(message)
+      if (!parsed || typeof parsed.type !== 'string') {
+        console.error('Invalid message format:', message.slice(0, 100))
+        return
+      }
+      msg = parsed as ClientMessage
+    } catch (e) {
+      console.error('Failed to parse message:', e)
+      return
+    }
+
     const playerId = this.connectionPlayerMap.get(sender.id)
     if (!playerId) return
 
