@@ -31,20 +31,12 @@ import {
   getTeamForPlayer,
   getNextPlayerIndex
 } from "../src/game/utils"
+import { getTrickEvents, CALL_TIMER_MS, TRICK_DISPLAY_MS } from "./helpers"
+import { handleJoin as handleJoinLogic, canStart } from "./handlers/lobby"
+import { handleSetTrump as handleSetTrumpLogic, handleCallThunee as handleCallThuneeLogic } from "./handlers/calling"
 
 interface ConnectionState {
   playerId: string
-}
-
-const CALL_TIMER_MS = 10000 // 10 seconds
-const TRICK_DISPLAY_MS = 2000 // 2 seconds to show completed trick
-
-function getTrickEvents(eventLog: GameEvent[], roundNumber?: number): (Trick & { winnerId: string })[] {
-  return eventLog
-    .filter((e): e is Extract<GameEvent, { type: 'trick' }> => 
-      e.type === 'trick' && (roundNumber === undefined || e.roundNumber === roundNumber)
-    )
-    .map(e => e.data)
 }
 
 type AlarmType = 'bidding' | 'trick-display'
@@ -221,49 +213,17 @@ export default class ThuneeServer implements Party.Server {
   }
 
   handleJoin(playerId: string, name: string, playerCount: 2 | 4 | undefined, conn: Party.Connection, existingPlayerId?: string) {
-    // Check if this is a reconnection by playerId first, then by name
-    let existingPlayer = existingPlayerId
-      ? this.state.players.find(p => p.id === existingPlayerId)
-      : null
-
-    // Fallback to name-based reconnection
-    if (!existingPlayer) {
-      existingPlayer = this.state.players.find(p => p.name === name)
+    const result = handleJoinLogic(this.state, playerId, name, playerCount, existingPlayerId)
+    
+    // Update connection mapping based on result
+    if (result.type === 'reconnected') {
+      this.connectionPlayerMap.set(conn.id, result.playerId)
     }
-
-    if (existingPlayer) {
-      existingPlayer.connected = true
-      this.connectionPlayerMap.set(conn.id, existingPlayer.id)
-      return
-    }
-
-    // Set player count if this is the first player
-    if (this.state.players.length === 0 && playerCount) {
-      this.state.playerCount = playerCount
-    }
-
-    // Check if game is full
-    if (this.state.players.length >= this.state.playerCount) {
-      // Add as spectator
-      const spectator = createPlayer(playerId, name, 0)
-      spectator.isSpectator = true
-      this.state.spectators.push(spectator)
-      return
-    }
-
-    const team = getTeamForPlayer(this.state.players.length)
-    const player = createPlayer(playerId, name, team)
-    this.state.players.push(player)
-
-    if (this.state.players.length === 1) {
-      this.state.dealerId = playerId
-    }
+    // For 'joined' and 'spectator', the playerId is already mapped in onConnect
   }
 
   handleStart() {
-    if (this.state.players.length !== this.state.playerCount) return
-    if (this.state.phase !== "waiting" && this.state.phase !== "round-end") return
-
+    if (!canStart(this.state)) return
     this.startDeal()
   }
 
@@ -506,31 +466,11 @@ export default class ThuneeServer implements Party.Server {
   }
 
   handleSetTrump(playerId: string, suit: Suit, lastCard?: boolean) {
-    if (this.state.phase !== "calling") return
-    if (this.state.trumpCallerId !== playerId) return
-
-    this.state.trump = suit
-    this.state.isLastCardTrump = lastCard ?? false
-
-    // Player after trumper (in play order) leads first trick
-    const trumperIndex = this.state.players.findIndex(p => p.id === playerId)
-    const leaderIndex = (trumperIndex + 1) % this.state.playerCount
-    this.state.currentPlayerId = this.state.players[leaderIndex].id
-    this.state.phase = "playing"
+    handleSetTrumpLogic(this.state, playerId, suit, lastCard)
   }
 
   handleCallThunee(playerId: string) {
-    if (this.state.phase !== "calling") return
-    if (this.state.trumpCallerId !== playerId) return
-
-    this.state.thuneeCallerId = playerId
-    this.state.trump = null // No trump in Thunee
-
-    // Player after thunee caller (in play order) leads first trick
-    const callerIndex = this.state.players.findIndex(p => p.id === playerId)
-    const leaderIndex = (callerIndex + 1) % this.state.playerCount
-    this.state.currentPlayerId = this.state.players[leaderIndex].id
-    this.state.phase = "playing"
+    handleCallThuneeLogic(this.state, playerId)
   }
 
   handleCallJodhi(playerId: string, suit: Suit, withJack: boolean) {
