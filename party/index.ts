@@ -1,36 +1,6 @@
 import type * as Party from "partykit/server"
-import type {
-  GameState,
-  ClientMessage,
-  ServerMessage,
-  Card,
-  Suit,
-  Player,
-  GameEvent,
-  Trick
-} from "../src/game/types"
-import {
-  createInitialState,
-  createPlayer,
-  createEmptyTrick,
-  createEmptyBidState,
-  serializeState,
-  deserializeState
-} from "../src/game/state"
-import {
-  createDeck,
-  shuffleDeck,
-  cardEquals
-} from "../src/game/deck"
-import {
-  isValidPlay,
-  getTrickWinner,
-  getTrickPoints
-} from "../src/game/rules"
-import {
-  getTeamForPlayer,
-  getNextPlayerIndex
-} from "../src/game/utils"
+import type { GameState, ClientMessage, ServerMessage, Card, Suit } from "../src/game/types"
+import { createInitialState, serializeState, deserializeState } from "../src/game/state"
 import { getTrickEvents, CALL_TIMER_MS, TRICK_DISPLAY_MS } from "./helpers"
 import { handleJoin as handleJoinLogic, canStart } from "./handlers/lobby"
 import { handleSetTrump as handleSetTrumpLogic, handleCallThunee as handleCallThuneeLogic } from "./handlers/calling"
@@ -62,6 +32,7 @@ import {
   evaluateKhanaak,
   applyKhanaakResult
 } from "./handlers/round"
+import { setupBiddingPhase } from "./handlers/dealing"
 
 interface ConnectionState {
   playerId: string
@@ -256,80 +227,7 @@ export default class ThuneeServer implements Party.Server {
   }
 
   startDeal() {
-    this.state.deck = shuffleDeck(createDeck())
-    this.state.phase = "dealing-first"
-    this.state.bidState = createEmptyBidState()
-    this.state.trump = null
-    this.state.trumpCallerId = null
-    this.state.trumpRevealed = false
-    this.state.thuneeCallerId = null
-    this.state.jodhiCalls = []
-    this.state.jodhiWindow = false
-    this.state.lastTrickWinningTeam = null
-    this.state.currentTrick = createEmptyTrick()
-    this.state.tricksPlayed = 0
-    // Don't reset eventLog - persist across rounds
-    this.state.challengeResult = null
-    this.state.lastBallAward = null
-
-    // Reset hands
-    for (const player of this.state.players) {
-      player.hand = []
-    }
-
-    // Deal first 4 cards to each player
-    if (this.state.playerCount === 4) {
-      // 4-player: 4 cards each from first 16 cards
-      for (let i = 0; i < 4; i++) {
-        const start = i * 4
-        this.state.players[i].hand = this.state.deck.slice(start, start + 4)
-      }
-    } else {
-      // 2-player: 4 cards each from first 8 cards
-      // Player 0: cards 0-3, Player 1: cards 4-7
-      for (let i = 0; i < 2; i++) {
-        const start = i * 4
-        this.state.players[i].hand = this.state.deck.slice(start, start + 4)
-      }
-    }
-
-    // Determine default trumper based on score
-    // 1. Team that is ahead gets to trump
-    // 2. If tied, team that won last round gets to trump
-    // 3. Otherwise, RHO of dealer
-    const team0Balls = this.state.teams[0].balls
-    const team1Balls = this.state.teams[1].balls
-    
-    // Get last round winner from event log
-    const lastRoundEnd = [...this.state.eventLog]
-      .reverse()
-      .find((e): e is Extract<typeof e, { type: 'round-end' }> => e.type === 'round-end')
-    const lastRoundWinner = lastRoundEnd?.data.winningTeam ?? null
-    
-    let trumpingTeam: 0 | 1 | null = null
-    if (team0Balls > team1Balls) {
-      trumpingTeam = 0
-    } else if (team1Balls > team0Balls) {
-      trumpingTeam = 1
-    } else if (lastRoundWinner !== null) {
-      trumpingTeam = lastRoundWinner
-    }
-    
-    if (trumpingTeam !== null) {
-      // Find a player from the trumping team to be default trumper
-      const trumpingPlayer = this.state.players.find(p => p.team === trumpingTeam)
-      this.state.bidState.defaultTrumperId = trumpingPlayer?.id ?? this.state.players[0].id
-    } else {
-      // Fallback: RHO of dealer
-      const dealerIndex = this.state.players.findIndex(p => p.id === this.state.dealerId)
-      const rhoIndex = (dealerIndex + this.state.playerCount - 1) % this.state.playerCount
-      this.state.bidState.defaultTrumperId = this.state.players[rhoIndex].id
-    }
-
-    // Move to calling phase with timer
-    // Others have 10s to call, otherwise default trumper's selection is used
-    this.state.phase = "bidding"
-    this.state.currentPlayerId = null // Anyone can call
+    setupBiddingPhase(this.state)
     this.startCallTimer()
   }
 
