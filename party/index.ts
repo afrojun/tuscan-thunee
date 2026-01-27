@@ -40,6 +40,11 @@ import {
   handlePreselectTrump as handlePreselectTrumpLogic,
   handleTimerExpired as handleTimerExpiredLogic
 } from "./handlers/bidding"
+import {
+  handleCallJodhi as handleCallJodhiLogic,
+  handlePlayCard as handlePlayCardLogic,
+  handleTrickDisplayComplete as handleTrickDisplayCompleteLogic
+} from "./handlers/playing"
 
 interface ConnectionState {
   playerId: string
@@ -377,133 +382,21 @@ export default class ThuneeServer implements Party.Server {
   }
 
   handleCallJodhi(playerId: string, suit: Suit, withJack: boolean) {
-    if (this.state.phase !== "playing" && this.state.phase !== "trick-complete") return
-    if (!this.state.jodhiWindow) return
-
-    // Caller must be on the winning team
-    const caller = this.state.players.find(p => p.id === playerId)
-    if (!caller) return
-    if (caller.team !== this.state.lastTrickWinningTeam) return
-
-    // Check if already called Jodhi for this suit by this player
-    const alreadyCalled = this.state.jodhiCalls.some(j =>
-      j.playerId === playerId && j.suit === suit
-    )
-    if (alreadyCalled) return
-
-    // Calculate points based on claim (not validation - that happens on challenge)
-    const isTrump = suit === this.state.trump
-    const points = withJack 
-      ? (isTrump ? 50 : 30) 
-      : (isTrump ? 40 : 20)
-
-    this.state.jodhiCalls.push({
-      playerId,
-      points,
-      suit,
-      hasJack: withJack  // This is what they CLAIMED, not validated
-    })
-
-    // Log the jodhi call
-    this.state.eventLog.push({
-      type: 'jodhi-call',
-      data: { playerId, suit, points, hasJack: withJack },
-      roundNumber: this.state.gameRound,
-      timestamp: Date.now()
-    })
+    handleCallJodhiLogic(this.state, playerId, suit, withJack)
   }
 
   handlePlayCard(playerId: string, card: Card) {
-    if (this.state.phase !== "playing") return
-    if (this.state.currentPlayerId !== playerId) return
-
-    // Close jodhi window and clear last trick result when a card is played
-    this.state.jodhiWindow = false
-    this.state.lastTrickResult = null
-
-    const player = this.state.players.find(p => p.id === playerId)
-    if (!player) return
-
-    const cardIndex = player.hand.findIndex(c => cardEquals(c, card))
-    if (cardIndex === -1) return
-
-    // Remove card from hand
-    player.hand.splice(cardIndex, 1)
-
-    // Add to trick
-    if (this.state.currentTrick.cards.length === 0) {
-      this.state.currentTrick.leadSuit = card.suit
-      // Reveal trump when first card of first trick is played
-      if (this.state.tricksPlayed === 0 && !this.state.trumpRevealed) {
-        this.state.trumpRevealed = true
-      }
+    const result = handlePlayCardLogic(this.state, playerId, card)
+    if (result.success && result.trickComplete) {
+      this.startTrickDisplayTimer()
     }
-    this.state.currentTrick.cards.push({ playerId, card })
-
-    // Check if trick is complete (use actual player count, not configured playerCount)
-    if (this.state.currentTrick.cards.length === this.state.players.length) {
-      this.completeTrick()
-    } else {
-      // Next player
-      const currentIndex = this.state.players.findIndex(p => p.id === playerId)
-      const nextIndex = getNextPlayerIndex(currentIndex, this.state.playerCount)
-      this.state.currentPlayerId = this.state.players[nextIndex].id
-    }
-  }
-
-  completeTrick() {
-    const winnerId = getTrickWinner(this.state.currentTrick, this.state.trump)
-    this.state.currentTrick.winnerId = winnerId
-
-    // Add points to winning team
-    const winner = this.state.players.find(p => p.id === winnerId)!
-    const points = getTrickPoints(this.state.currentTrick)
-    this.state.teams[winner.team].cardPoints += points
-
-    // Find winning card and determine reason
-    const winningPlay = this.state.currentTrick.cards.find(c => c.playerId === winnerId)!
-    const wonByTrump = this.state.trump && winningPlay.card.suit === this.state.trump
-
-    // Store trick result for UI display
-    this.state.lastTrickResult = {
-      winnerId,
-      winnerName: winner.name,
-      winningCard: winningPlay.card,
-      points,
-      reason: wonByTrump ? 'trump' : 'highest'
-    }
-
-    // Save trick to event log
-    this.state.eventLog.push({
-      type: 'trick',
-      data: { ...this.state.currentTrick, winnerId },
-      roundNumber: this.state.gameRound,
-      timestamp: Date.now()
-    })
-
-    this.state.tricksPlayed++
-
-    // Open jodhi window for winning team
-    this.state.jodhiWindow = true
-    this.state.lastTrickWinningTeam = winner.team
-
-    // Enter trick-complete phase to show the winner briefly
-    this.state.phase = "trick-complete"
-    this.startTrickDisplayTimer()
   }
 
   onTrickDisplayComplete() {
-    // Check if round is over (6 tricks for 4 players, 6 per round for 2 players)
-    if (this.state.tricksPlayed === 6) {
+    const result = handleTrickDisplayCompleteLogic(this.state)
+    if (result.roundOver) {
       this.endRound()
-    } else {
-      // Winner leads next trick
-      const winnerId = this.state.currentTrick.winnerId!
-      this.state.currentTrick = createEmptyTrick()
-      this.state.currentPlayerId = winnerId
-      this.state.phase = "playing"
     }
-
     this.saveState()
     this.broadcastState()
   }
