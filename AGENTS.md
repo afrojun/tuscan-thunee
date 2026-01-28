@@ -12,6 +12,8 @@ bun run dev
 # Run PartyKit game server (localhost:1999)
 bun run party
 
+# Quick test: Click "🤖 Quick Test (4P vs AI)" on home page to instantly start a 4-player game with 3 AI opponents
+
 # Type check
 bun run check
 

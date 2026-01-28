@@ -30,6 +30,11 @@ export function Home() {
     navigate(`/game/${gameId}?players=${playerCount}&cardBack=${cardBackStyle}`)
   }
 
+  const handleQuickTest = () => {
+    const gameId = generateGameCode()
+    navigate(`/game/${gameId}?players=4&cardBack=${cardBackStyle}&quickTest=true`)
+  }
+
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault()
     if (joinCode.length === 6) {
@@ -71,6 +76,15 @@ export function Home() {
           <button onClick={handleCreate} className="btn-retro w-full">
             CREATE
           </button>
+          
+          {import.meta.env.DEV && (
+            <button 
+              onClick={handleQuickTest} 
+              className="w-full py-1 font-mono text-[10px] text-gray-500 hover:text-retro-gold transition-colors"
+            >
+              🤖 Quick Test (4P vs AI)
+            </button>
+          )}
         </div>
 
         <div className="border-t-2 border-retro-black pt-6 space-y-3">

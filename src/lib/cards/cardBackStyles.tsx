@@ -24,8 +24,8 @@ export const CARD_BACK_STYLES: Record<CardBackStyle, CardBackStyleConfig> = {
     description: 'Clean and modern with elegant simplicity',
   },
   felt: {
-    name: 'Felt',
-    description: 'Match the game table texture',
+    name: 'Casino',
+    description: 'Rich burgundy casino table style',
   },
 }
 

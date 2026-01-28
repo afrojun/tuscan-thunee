@@ -26,9 +26,11 @@ export function Game() {
   const [searchParams] = useSearchParams()
   const playerCount = (searchParams.get('players') === '2' ? 2 : 4) as 2 | 4
   const cardBackStyle = (searchParams.get('cardBack') as CardBackStyle) || 'classic'
+  const isQuickTest = searchParams.get('quickTest') === 'true'
   
   const [playerName, setPlayerName] = useState(() => getStoredPlayerName(gameId!) || '')
   const [hasJoined, setHasJoined] = useState(false)
+  const [quickTestInitiated, setQuickTestInitiated] = useState(false)
   
   const { gameState, playerId, send, connected } = usePartySocket(gameId!)
 
@@ -57,6 +59,35 @@ export function Game() {
       }
     }
   }, [connected, gameState, hasJoined, gameId, send, playerCount])
+
+  // Quick test: auto-join as "Tester", add 3 AI players, and start game
+  useEffect(() => {
+    if (!isQuickTest || quickTestInitiated || !connected || !gameState) return
+    
+    const humanPlayers = gameState.players.filter(p => !p.isAI).length
+    const totalPlayers = gameState.players.length
+    
+    // Step 1: Join as Tester if not joined
+    if (!hasJoined && humanPlayers === 0) {
+      setPlayerName('Tester')
+      storePlayerName(gameId!, 'Tester')
+      send({ type: 'join', name: 'Tester', playerCount: 4 })
+      setHasJoined(true)
+      return
+    }
+    
+    // Step 2: Add AI players until we have 4
+    if (hasJoined && totalPlayers < 4 && gameState.phase === 'waiting') {
+      send({ type: 'add-ai' })
+      return
+    }
+    
+    // Step 3: Start the game when we have 4 players
+    if (hasJoined && totalPlayers === 4 && gameState.phase === 'waiting') {
+      send({ type: 'start' })
+      setQuickTestInitiated(true)
+    }
+  }, [isQuickTest, quickTestInitiated, connected, gameState, hasJoined, gameId, send])
 
   const handleJoin = (name: string) => {
     setPlayerName(name)

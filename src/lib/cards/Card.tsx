@@ -44,7 +44,7 @@ export function Card({
   if (faceDown) {
     return (
       <div 
-        className={`${sizeClasses} rounded-lg shadow-retro-sm overflow-hidden border border-gray-300 bg-white p-1`}
+        className={`${sizeClasses} rounded-lg shadow-retro-sm overflow-hidden border border-gray-300 bg-white p-0.5`}
       >
         <CardBackPattern style={backStyle} />
       </div>
@@ -230,25 +230,41 @@ function MinimalCardBack() {
 function FeltCardBack() {
   return (
     <div 
-      className="w-full h-full rounded border-2 border-yellow-600 overflow-hidden flex items-center justify-center"
+      className="w-full h-full rounded border-2 border-amber-700 overflow-hidden flex items-center justify-center relative"
       style={{
-        backgroundColor: '#1a4d2e',
+        backgroundColor: '#8b1538',
         backgroundImage: `
           repeating-linear-gradient(
-            45deg,
+            0deg,
             transparent,
-            transparent 2px,
-            rgba(0, 0, 0, 0.1) 2px,
-            rgba(0, 0, 0, 0.1) 4px
+            transparent 3px,
+            rgba(0, 0, 0, 0.08) 3px,
+            rgba(0, 0, 0, 0.08) 6px
+          ),
+          repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 3px,
+            rgba(0, 0, 0, 0.05) 3px,
+            rgba(0, 0, 0, 0.05) 6px
           )
         `,
       }}
     >
-      <div className="text-center">
-        <div className="text-3xl font-bold text-yellow-600" style={{ textShadow: '0 0 6px rgba(212, 168, 71, 0.5)' }}>
-          ◆
-        </div>
-        <p className="text-xs text-yellow-600 mt-1 font-retro">THUNEE</p>
+      {/* Corner diamonds */}
+      <div className="absolute top-1 left-1 text-amber-400 text-[8px]">♦</div>
+      <div className="absolute top-1 right-1 text-amber-400 text-[8px]">♦</div>
+      <div className="absolute bottom-1 left-1 text-amber-400 text-[8px]">♦</div>
+      <div className="absolute bottom-1 right-1 text-amber-400 text-[8px]">♦</div>
+      
+      {/* Center oval with T */}
+      <div 
+        className="w-8 h-10 rounded-full border-2 border-amber-400 flex items-center justify-center"
+        style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+      >
+        <span className="text-amber-400 font-retro text-lg" style={{ textShadow: '0 0 4px rgba(251, 191, 36, 0.5)' }}>
+          T
+        </span>
       </div>
     </div>
   )
@@ -261,7 +277,7 @@ export function CardBack({ small = false, style = 'classic' }: { small?: boolean
 
   return (
     <div 
-      className={`${sizeClasses} rounded-lg shadow-retro-sm overflow-hidden border border-gray-300 bg-white p-1`}
+      className={`${sizeClasses} rounded-lg shadow-retro-sm overflow-hidden border border-gray-300 bg-white p-0.5`}
     >
       <CardBackPattern style={style} />
     </div>
