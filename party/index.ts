@@ -41,56 +41,54 @@ interface MessageContext {
 }
 
 /**
- * Message handler function type.
+ * Extract specific message type from the ClientMessage union.
  */
-type MessageHandler<T extends ClientMessage = ClientMessage> = (
+type MessageOfType<T extends ClientMessage['type']> = Extract<ClientMessage, { type: T }>
+
+/**
+ * Typed handler that knows its exact message shape.
+ */
+type TypedHandler<T extends ClientMessage['type']> = (
   ctx: MessageContext,
-  msg: T
+  msg: MessageOfType<T>
 ) => void | Promise<void>
+
+/**
+ * Generic handler for the Map (erases specific type info).
+ */
+type MessageHandler = (ctx: MessageContext, msg: ClientMessage) => void | Promise<void>
+
+/**
+ * Type-safe helper to register a handler with correct message typing.
+ */
+function handler<T extends ClientMessage['type']>(
+  type: T,
+  fn: TypedHandler<T>
+): [T, MessageHandler] {
+  return [type, fn as MessageHandler]
+}
 
 export default class ThuneeServer implements Party.Server {
   state: GameState
   connectionPlayerMap: Map<string, string> = new Map() // connectionId -> playerId
   pendingAlarmType: AlarmType | null = null
 
-  /** Message handler registry */
-  private handlers: Map<ClientMessage['type'], MessageHandler> = new Map([
-    ['join', (ctx, msg) => {
-      if (msg.type !== 'join') return
+  /** Message handler registry - type-safe via handler() helper */
+  private handlers = new Map<ClientMessage['type'], MessageHandler>([
+    handler('join', (ctx, msg) => {
       this.handleJoin(ctx.playerId, msg.name, msg.playerCount, ctx.conn, msg.existingPlayerId)
-    }],
-    ['start', () => this.handleStart()],
-    ['bid', (ctx, msg) => {
-      if (msg.type !== 'bid') return
-      this.handleBid(ctx.playerId, msg.amount)
-    }],
-    ['pass', (ctx) => this.handlePass(ctx.playerId)],
-    ['preselect-trump', (ctx, msg) => {
-      if (msg.type !== 'preselect-trump') return
-      this.handlePreselectTrump(ctx.playerId, msg.suit)
-    }],
-    ['set-trump', (ctx, msg) => {
-      if (msg.type !== 'set-trump') return
-      this.handleSetTrump(ctx.playerId, msg.suit, msg.lastCard)
-    }],
-    ['call-thunee', (ctx) => this.handleCallThunee(ctx.playerId)],
-    ['call-jodhi', (ctx, msg) => {
-      if (msg.type !== 'call-jodhi') return
-      this.handleCallJodhi(ctx.playerId, msg.suit, msg.withJack)
-    }],
-    ['play-card', (ctx, msg) => {
-      if (msg.type !== 'play-card') return
-      this.handlePlayCard(ctx.playerId, msg.card)
-    }],
-    ['challenge-play', (ctx, msg) => {
-      if (msg.type !== 'challenge-play') return
-      this.handleChallengePlay(ctx.playerId, msg.accusedId)
-    }],
-    ['challenge-jodhi', (ctx, msg) => {
-      if (msg.type !== 'challenge-jodhi') return
-      this.handleChallengeJodhi(ctx.playerId, msg.accusedId, msg.suit)
-    }],
-    ['call-khanaak', (ctx) => this.handleCallKhanaak(ctx.playerId)],
+    }),
+    handler('start', () => this.handleStart()),
+    handler('bid', (ctx, msg) => this.handleBid(ctx.playerId, msg.amount)),
+    handler('pass', (ctx) => this.handlePass(ctx.playerId)),
+    handler('preselect-trump', (ctx, msg) => this.handlePreselectTrump(ctx.playerId, msg.suit)),
+    handler('set-trump', (ctx, msg) => this.handleSetTrump(ctx.playerId, msg.suit, msg.lastCard)),
+    handler('call-thunee', (ctx) => this.handleCallThunee(ctx.playerId)),
+    handler('call-jodhi', (ctx, msg) => this.handleCallJodhi(ctx.playerId, msg.suit, msg.withJack)),
+    handler('play-card', (ctx, msg) => this.handlePlayCard(ctx.playerId, msg.card)),
+    handler('challenge-play', (ctx, msg) => this.handleChallengePlay(ctx.playerId, msg.accusedId)),
+    handler('challenge-jodhi', (ctx, msg) => this.handleChallengeJodhi(ctx.playerId, msg.accusedId, msg.suit)),
+    handler('call-khanaak', (ctx) => this.handleCallKhanaak(ctx.playerId)),
   ])
 
   constructor(readonly room: Party.Room) {
