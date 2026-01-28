@@ -48,13 +48,23 @@ export function Card({
         ${sizeClasses}
         bg-white border-2 border-gray-300 rounded-lg shadow-md
         flex flex-col items-center justify-center gap-0
-        transition-all duration-150
+        transition-all duration-150 relative
         ${!disabled 
           ? 'hover:-translate-y-3 hover:scale-105 hover:shadow-xl hover:border-retro-gold/50 cursor-pointer active:scale-95' 
           : 'cursor-default'}
         ${selected ? '-translate-y-3 ring-2 ring-retro-gold' : ''}
         ${SUIT_CSS_COLORS[card.suit]}
       `}
+      style={{
+        backgroundImage: `
+          linear-gradient(135deg, transparent 8px, #d4a847 8px, #d4a847 10px, transparent 10px),
+          linear-gradient(-135deg, transparent 8px, #d4a847 8px, #d4a847 10px, transparent 10px),
+          linear-gradient(45deg, transparent 8px, #d4a847 8px, #d4a847 10px, transparent 10px),
+          linear-gradient(-45deg, transparent 8px, #d4a847 8px, #d4a847 10px, transparent 10px)
+        `,
+        backgroundPosition: 'top left, top right, bottom left, bottom right',
+        backgroundRepeat: 'no-repeat',
+      }}
     >
       <span className={`font-bold leading-none ${small ? 'text-xl' : 'text-3xl sm:text-4xl'}`}>
         {card.rank}

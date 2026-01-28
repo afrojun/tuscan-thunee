@@ -9,6 +9,14 @@
 
   body {
     @apply bg-felt text-retro-cream font-mono antialiased;
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
   }
 }
 
@@ -19,14 +27,42 @@
            hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-retro-sm
            active:translate-x-[4px] active:translate-y-[4px] active:shadow-none
            transition-all duration-75;
+    border-top: 3px solid #f5f0e6;
+    border-left: 3px solid #f5f0e6;
+    border-bottom: 3px solid #4a4a4a;
+    border-right: 3px solid #4a4a4a;
+    position: relative;
+    background: linear-gradient(135deg, #e8c65f 0%, #d4a847 100%);
+  }
+
+  .btn-retro:hover {
+    background: linear-gradient(135deg, #f0d166 0%, #ddb550 100%);
   }
 
   .btn-danger {
     @apply btn-retro bg-retro-red text-retro-cream;
+    background: linear-gradient(135deg, #d94545 0%, #c23a3a 100%);
+    border-top: 3px solid #ff6b6b;
+    border-bottom: 3px solid #7a1a1a;
+    border-right: 3px solid #7a1a1a;
+  }
+
+  .btn-danger:hover {
+    background: linear-gradient(135deg, #e04e4e 0%, #d04141 100%);
   }
 
   .card-container {
     @apply bg-card border-2 border-card-border rounded shadow-retro;
+  }
+
+  h1 {
+    text-shadow: 
+      0 0 10px rgba(212, 168, 71, 0.4),
+      2px 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  h2 {
+    text-shadow: 0 0 4px rgba(212, 168, 71, 0.2);
   }
 }
 
