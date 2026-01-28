@@ -80,7 +80,10 @@ export function BiddingPanel({
         )}
 
         <div className="text-center">
-          <p className="font-retro text-xs text-retro-black">SELECT TRUMP</p>
+          <p className="font-retro text-xs text-retro-black flex items-center justify-center gap-2">
+            <span className="text-base">🎺</span>
+            SELECT TRUMP
+          </p>
           <p className="font-mono text-[10px] text-gray-500 mt-1">
             Others can still call to challenge
           </p>
@@ -143,7 +146,10 @@ export function BiddingPanel({
         )}
 
         <div className="text-center">
-          <p className="font-retro text-xs text-retro-black">YOU CALLED {bidState.currentBid}</p>
+          <p className="font-retro text-xs text-retro-black flex items-center justify-center gap-2">
+            <span className="text-base">✓</span>
+            YOU CALLED {bidState.currentBid}
+          </p>
           <p className="font-mono text-[10px] text-gray-500 mt-1">
             Select trump while waiting for counter-calls
           </p>
@@ -189,7 +195,10 @@ export function BiddingPanel({
         )}
 
         <div className="text-center">
-          <p className="font-retro text-xs text-retro-black">CALLING PHASE</p>
+          <p className="font-retro text-xs text-retro-black flex items-center justify-center gap-2">
+            <span className="text-base">📯</span>
+            CALLING PHASE
+          </p>
           <p className="font-mono text-xs text-gray-600 mt-1">
             Call to take trumping, or wait
           </p>

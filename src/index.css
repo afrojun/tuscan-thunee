@@ -33,6 +33,30 @@
     border-right: 3px solid #4a4a4a;
     position: relative;
     background: linear-gradient(135deg, #e8c65f 0%, #d4a847 100%);
+    overflow: hidden;
+  }
+
+  .btn-retro::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 100%
+    );
+    transform: rotate(45deg);
+    animation: btn-shine 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes btn-shine {
+    0%, 100% { transform: rotate(45deg) translateX(-100%); }
+    50% { transform: rotate(45deg) translateX(100%); }
   }
 
   .btn-retro:hover {
@@ -114,12 +138,26 @@
       box-shadow: 0 0 0px rgba(212, 168, 71, 0);
     }
     50% { 
-      box-shadow: 0 0 20px rgba(212, 168, 71, 0.8), 0 0 40px rgba(212, 168, 71, 0.4);
+      box-shadow: 0 0 25px rgba(212, 168, 71, 1), 0 0 50px rgba(212, 168, 71, 0.6), 0 0 75px rgba(212, 168, 71, 0.3);
     }
   }
 
   .animate-winner-glow {
-    animation: winner-glow 0.6s ease-in-out 2;
+    animation: winner-glow 0.8s ease-in-out 3;
+  }
+
+  /* Progress bar glow for balls */
+  @keyframes progress-glow {
+    0%, 100% {
+      box-shadow: 0 0 2px rgba(212, 168, 71, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 8px rgba(212, 168, 71, 0.8), 0 0 16px rgba(212, 168, 71, 0.4);
+    }
+  }
+
+  .progress-glow {
+    animation: progress-glow 2s ease-in-out infinite;
   }
 
   /* Score change pop */

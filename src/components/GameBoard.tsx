@@ -316,7 +316,10 @@ export function GameBoard({ gameState, playerId, onAction, cardBackStyle = 'clas
 
           {gameState.phase === 'round-end' && (
             <div className="card-container p-4 text-center space-y-3">
-              <p className="font-retro text-xs text-retro-black">ROUND OVER</p>
+              <p className="font-retro text-xs text-retro-black flex items-center justify-center gap-2">
+                <span className="text-base">🏁</span>
+                ROUND OVER
+              </p>
               <p className="font-mono text-sm text-retro-black">
                 T1: {gameState.teams[0].cardPoints} | T2: {gameState.teams[1].cardPoints}
               </p>
@@ -331,7 +334,11 @@ export function GameBoard({ gameState, playerId, onAction, cardBackStyle = 'clas
 
           {gameState.phase === 'game-over' && (
             <div className="card-container p-4 text-center space-y-3">
-              <p className="font-retro text-sm text-retro-gold">GAME OVER</p>
+              <p className="font-retro text-sm text-retro-gold flex items-center justify-center gap-2">
+                <span className="text-xl">🏆</span>
+                GAME OVER
+                <span className="text-xl">🏆</span>
+              </p>
               <p className="font-mono text-sm text-retro-black">
                 {gameState.teams[0].balls >= 13 
                   ? `${gameState.players.filter(p => p.team === 0).map(p => p.name).join(' & ')} WIN!`

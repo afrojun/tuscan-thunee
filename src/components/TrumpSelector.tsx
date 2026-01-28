@@ -26,7 +26,10 @@ export function TrumpSelector({ onSelectTrump, onCallThunee, isCurrentPlayer }: 
 
   return (
     <div className="card-container p-4 space-y-4">
-      <p className="font-retro text-xs text-retro-black text-center">SELECT TRUMP</p>
+      <p className="font-retro text-xs text-retro-black text-center flex items-center justify-center gap-2">
+        <span className="text-base">🎺</span>
+        SELECT TRUMP
+      </p>
 
       <div className="grid grid-cols-4 gap-2">
         {SUITS.map(({ suit, symbol, color }) => (

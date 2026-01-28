@@ -123,6 +123,13 @@ export function ScoreBoard({
               <span>Balls:</span>
               <span className="font-bold text-lg sm:text-xl">{teams[0].balls}/{winThreshold}</span>
             </div>
+            {/* Ball progress bar */}
+            <div className={`h-2 bg-gray-200 rounded-full overflow-hidden border border-gray-300 ${teams[0].balls > 0 ? 'progress-glow' : ''}`}>
+              <div 
+                className="h-full bg-gradient-to-r from-retro-gold to-yellow-500 transition-all duration-500"
+                style={{ width: `${(teams[0].balls / winThreshold) * 100}%` }}
+              />
+            </div>
             <div className="flex justify-between font-mono text-sm sm:text-base text-gray-600">
               <span>Hands:</span>
               <span>{team0Tricks}</span>
@@ -141,6 +148,13 @@ export function ScoreBoard({
             <div className="flex justify-between font-mono text-base sm:text-lg text-retro-black">
               <span>Balls:</span>
               <span className="font-bold text-lg sm:text-xl">{teams[1].balls}/{winThreshold}</span>
+            </div>
+            {/* Ball progress bar */}
+            <div className={`h-2 bg-gray-200 rounded-full overflow-hidden border border-gray-300 ${teams[1].balls > 0 ? 'progress-glow' : ''}`}>
+              <div 
+                className="h-full bg-gradient-to-r from-retro-gold to-yellow-500 transition-all duration-500"
+                style={{ width: `${(teams[1].balls / winThreshold) * 100}%` }}
+              />
             </div>
             <div className="flex justify-between font-mono text-sm sm:text-base text-gray-600">
               <span>Hands:</span>

@@ -364,11 +364,12 @@ Option D: Progress Indicators
 4. ✅ **Card corner decorations** (CSS border tricks)
 
 ### Medium Effort (2-4 hours each):
-1. 🎨 **Card suit-specific tints** (add color variants)
-2. 🎨 **Progress bars for scores** (new component)
-3. 🎨 **Enhanced phase indicators** (styling + icons)
-4. 🎨 **Winning card spotlight** (extend animation)
-5. 🎨 **More celebration effects** (particle system)
+1. ✅ **Card suit-specific tints** (add color variants)
+2. ✅ **Progress bars for scores** (new component)
+3. ✅ **Enhanced phase indicators** (styling + icons)
+4. ✅ **Winning card spotlight** (extend animation)
+5. ✅ **Button shimmer effect** (premium CSS animation)
+6. 🎨 **More celebration effects** (particle system)
 
 ### Larger Projects (4+ hours):
 1. 🎮 **Trick area visual hierarchy** (major redesign)
@@ -402,8 +403,12 @@ The game should look like:
 
 ## Next Steps
 
-**Phase 1 (Easy)**: Add button bevels, card corner decorations, felt texture
-**Phase 2 (Medium)**: Card color tints, progress bars, phase icons, enhanced glow effects
+~~**Phase 1 (Easy)**: Add button bevels, card corner decorations, felt texture~~ ✅ COMPLETED
+~~**Phase 2 (Medium)**: Card color tints, progress bars, phase icons, enhanced glow effects~~ ✅ COMPLETED
 **Phase 3 (Nice-to-Have)**: Trick animation choreography, team color schemes, dark mode
 
-Pick 2-3 from Phase 1 to start - they'll have high visual impact with minimal effort.
+## Additional Completed Enhancements
+
+- **Selectable card back styles**: 5 unique designs (Classic, Arcade, Ornamental, Minimal, Felt)
+- **Button shimmer effect**: Subtle animated shine on gold buttons
+- **Progress bar glow**: Animated glow when team has balls

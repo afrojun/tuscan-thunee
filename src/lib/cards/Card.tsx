@@ -9,6 +9,14 @@ const SUIT_CSS_COLORS: Record<Suit, string> = {
   spades: 'text-gray-900',
 }
 
+// Subtle background tints for each suit (solid colors with white base)
+const SUIT_BG_TINTS: Record<Suit, string> = {
+  hearts: '#fff8f8',
+  diamonds: '#fffaf6',
+  clubs: '#f6fff8',
+  spades: '#f8f8ff',
+}
+
 interface CardProps {
   /** Any card object with suit and rank */
   card: { suit: Suit; rank: string }
@@ -59,6 +67,7 @@ export function Card({
         ${SUIT_CSS_COLORS[card.suit]}
       `}
       style={{
+        backgroundColor: SUIT_BG_TINTS[card.suit],
         backgroundImage: `
           linear-gradient(135deg, transparent 8px, #d4a847 8px, #d4a847 10px, transparent 10px),
           linear-gradient(-135deg, transparent 8px, #d4a847 8px, #d4a847 10px, transparent 10px),
