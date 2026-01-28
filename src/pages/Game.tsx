@@ -68,6 +68,10 @@ export function Game() {
     send({ type: 'start' })
   }
 
+  const handleAddAI = () => {
+    send({ type: 'add-ai' })
+  }
+
   if (!connected) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -88,6 +92,7 @@ export function Game() {
         hasJoined={hasJoined}
         onJoin={handleJoin}
         onStart={handleStart}
+        onAddAI={handleAddAI}
       />
     )
   }

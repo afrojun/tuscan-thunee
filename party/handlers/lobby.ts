@@ -75,3 +75,41 @@ export function canStart(state: GameState): boolean {
   if (state.phase !== 'waiting' && state.phase !== 'round-end') return false
   return true
 }
+
+// AI player names for variety
+const AI_NAMES = ['Bot Alice', 'Bot Bob', 'Bot Carol', 'Bot Dave']
+
+/**
+ * Add an AI player to the game.
+ * Returns the created player, or null if game is full.
+ */
+export function addAIPlayer(state: GameState, requestedTeam?: 0 | 1): Player | null {
+  // Can only add AI during waiting phase
+  if (state.phase !== 'waiting') return null
+  
+  // Check if game is full
+  if (state.players.length >= state.playerCount) return null
+  
+  // Determine team
+  const team = requestedTeam ?? getTeamForPlayer(state.players.length)
+  
+  // Generate unique AI ID
+  const aiId = `ai-${crypto.randomUUID().slice(0, 8)}`
+  
+  // Pick a name that hasn't been used
+  const usedNames = new Set(state.players.map(p => p.name))
+  const name = AI_NAMES.find(n => !usedNames.has(n)) ?? `Bot ${state.players.length + 1}`
+  
+  // Create the AI player
+  const player = createPlayer(aiId, name, team)
+  player.isAI = true
+  player.connected = true  // AI is always "connected"
+  state.players.push(player)
+  
+  // Set dealer if this is the first player
+  if (state.players.length === 1) {
+    state.dealerId = aiId
+  }
+  
+  return player
+}

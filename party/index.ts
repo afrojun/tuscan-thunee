@@ -3,8 +3,9 @@ import type { GameState, ClientMessage, ServerMessage, Suit, Card } from "../src
 import { createInitialState, serializeState, deserializeState } from "../src/game/state"
 import { CALL_TIMER_MS, TRICK_DISPLAY_MS, filterStateForPlayer } from "./helpers"
 import { handler, type MessageContext, type MessageHandler } from "./registry"
-import { handleJoin as handleJoinLogic, canStart } from "./handlers/lobby"
+import { handleJoin as handleJoinLogic, canStart, addAIPlayer as addAIPlayerLogic } from "./handlers/lobby"
 import { handleSetTrump as handleSetTrumpLogic, handleCallThunee as handleCallThuneeLogic } from "./handlers/calling"
+import { computeAIMove, getNextAIPlayer } from "./ai"
 import {
   handleBid as handleBidLogic,
   handlePass as handlePassLogic,
@@ -30,7 +31,10 @@ import {
 } from "./handlers/round"
 import { setupBiddingPhase } from "./handlers/dealing"
 
-type AlarmType = 'bidding' | 'trick-display'
+type AlarmType = 'bidding' | 'trick-display' | 'ai-turn'
+
+// Delay before AI makes a move (ms) - makes game feel more natural
+const AI_MOVE_DELAY_MS = 500
 
 export default class ThuneeServer implements Party.Server {
   state: GameState
@@ -43,6 +47,7 @@ export default class ThuneeServer implements Party.Server {
       this.handleJoin(ctx.playerId, msg.name, msg.playerCount, ctx.conn, msg.existingPlayerId)
     }),
     handler('start', () => this.handleStart()),
+    handler('add-ai', (ctx, msg) => this.handleAddAI(msg.team)),
     handler('bid', (ctx, msg) => this.handleBid(ctx.playerId, msg.amount)),
     handler('pass', (ctx) => this.handlePass(ctx.playerId)),
     handler('preselect-trump', (ctx, msg) => this.handlePreselectTrump(ctx.playerId, msg.suit)),
@@ -166,6 +171,9 @@ export default class ThuneeServer implements Party.Server {
 
     this.saveState()
     this.broadcastState()
+    
+    // Check if AI needs to act after this message
+    this.maybeScheduleAITurn()
   }
 
   handleJoin(playerId: string, name: string, playerCount: 2 | 4 | undefined, conn: Party.Connection, existingPlayerId?: string) {
@@ -216,7 +224,113 @@ export default class ThuneeServer implements Party.Server {
       this.onCallTimerExpired()
     } else if (alarmType === 'trick-display' && this.state.phase === "trick-complete") {
       this.onTrickDisplayComplete()
+    } else if (alarmType === 'ai-turn') {
+      this.executeAITurn()
     }
+  }
+
+  /**
+   * Handle adding an AI player to the game.
+   */
+  handleAddAI(team?: 0 | 1) {
+    if (this.state.phase !== 'waiting') return
+    
+    const player = addAIPlayerLogic(this.state, team)
+    if (player) {
+      this.saveState()
+      this.broadcastState()
+    }
+  }
+
+  /**
+   * Check if an AI player needs to act and schedule their turn.
+   */
+  async maybeScheduleAITurn() {
+    const aiPlayer = getNextAIPlayer(this.state)
+    if (!aiPlayer) return
+    
+    // Don't schedule if we already have an AI turn pending
+    if (this.pendingAlarmType === 'ai-turn') return
+    
+    // During bidding phase, execute AI decisions immediately (can't use alarm - would cancel bidding timer)
+    if (this.state.phase === 'bidding') {
+      this.executeAIBiddingTurn(aiPlayer)
+      return
+    }
+    
+    // Schedule AI move with a small delay for natural feel
+    this.pendingAlarmType = 'ai-turn'
+    await this.room.storage.setAlarm(Date.now() + AI_MOVE_DELAY_MS)
+  }
+
+  /**
+   * Execute AI bidding decision immediately (no alarm delay).
+   */
+  executeAIBiddingTurn(aiPlayer: ReturnType<typeof getNextAIPlayer>) {
+    if (!aiPlayer) return
+    
+    const decision = computeAIMove(this.state, aiPlayer.id)
+    if (!decision || decision.type === 'skip') {
+      // AI wants to let timer expire (e.g., to become default trumper)
+      return
+    }
+    
+    if (decision.type === 'bid') {
+      this.handleBid(aiPlayer.id, decision.amount)
+    } else if (decision.type === 'pass') {
+      this.handlePass(aiPlayer.id)
+    }
+    
+    this.saveState()
+    this.broadcastState()
+    
+    // Check if another AI needs to bid
+    const nextAI = getNextAIPlayer(this.state)
+    if (nextAI && this.state.phase === 'bidding') {
+      this.executeAIBiddingTurn(nextAI)
+    }
+  }
+
+  /**
+   * Execute the AI player's turn.
+   */
+  executeAITurn() {
+    const aiPlayer = getNextAIPlayer(this.state)
+    if (!aiPlayer) return
+    
+    const decision = computeAIMove(this.state, aiPlayer.id)
+    if (!decision || decision.type === 'skip') {
+      // AI doesn't need to act right now
+      return
+    }
+    
+    // Execute the AI's decision
+    switch (decision.type) {
+      case 'bid':
+        this.handleBid(aiPlayer.id, decision.amount)
+        break
+      case 'pass':
+        this.handlePass(aiPlayer.id)
+        break
+      case 'set-trump':
+        this.handleSetTrump(aiPlayer.id, decision.suit, decision.lastCard)
+        break
+      case 'play-card':
+        this.handlePlayCard(aiPlayer.id, decision.card)
+        break
+      case 'call-thunee':
+        this.handleCallThunee(aiPlayer.id)
+        break
+      case 'call-jodhi':
+        this.handleCallJodhi(aiPlayer.id, decision.suit, decision.withJack)
+        break
+    }
+    
+    this.saveState()
+    this.broadcastState()
+    
+    // Check if another AI needs to act
+    this.maybeScheduleAITurn()
   }
 
   onCallTimerExpired() {
@@ -224,6 +338,9 @@ export default class ThuneeServer implements Party.Server {
     handleTimerExpiredLogic(this.state)
     this.saveState()
     this.broadcastState()
+    
+    // Check if AI needs to act (e.g., set trump after becoming trumper)
+    this.maybeScheduleAITurn()
   }
 
   handleBid(playerId: string, amount: number) {
@@ -271,6 +388,9 @@ export default class ThuneeServer implements Party.Server {
     }
     this.saveState()
     this.broadcastState()
+    
+    // Check if AI needs to play next
+    this.maybeScheduleAITurn()
   }
 
   endRound() {

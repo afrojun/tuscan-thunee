@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
-import { handleJoin, canStart } from './lobby'
+import { handleJoin, canStart, addAIPlayer } from './lobby'
 import { createInitialState } from '../../src/game/state'
 import type { GameState } from '../../src/game/types'
 
@@ -136,5 +136,82 @@ describe('canStart', () => {
     state.phase = 'playing'
     
     expect(canStart(state)).toBe(false)
+  })
+})
+
+describe('addAIPlayer', () => {
+  let state: GameState
+
+  beforeEach(() => {
+    state = createInitialState('test-game', 4)
+  })
+
+  test('adds AI player with isAI flag', () => {
+    const player = addAIPlayer(state)
+    
+    expect(player).not.toBeNull()
+    expect(player!.isAI).toBe(true)
+    expect(player!.connected).toBe(true)
+    expect(state.players.length).toBe(1)
+  })
+
+  test('AI player gets unique name', () => {
+    addAIPlayer(state)
+    addAIPlayer(state)
+    
+    expect(state.players[0].name).not.toBe(state.players[1].name)
+  })
+
+  test('AI player ID starts with ai-', () => {
+    const player = addAIPlayer(state)
+    
+    expect(player!.id.startsWith('ai-')).toBe(true)
+  })
+
+  test('assigns team correctly', () => {
+    addAIPlayer(state)
+    addAIPlayer(state)
+    addAIPlayer(state)
+    addAIPlayer(state)
+    
+    expect(state.players[0].team).toBe(0)
+    expect(state.players[1].team).toBe(1)
+    expect(state.players[2].team).toBe(0)
+    expect(state.players[3].team).toBe(1)
+  })
+
+  test('returns null when game is full', () => {
+    addAIPlayer(state)
+    addAIPlayer(state)
+    addAIPlayer(state)
+    addAIPlayer(state)
+    
+    const result = addAIPlayer(state)
+    
+    expect(result).toBeNull()
+    expect(state.players.length).toBe(4)
+  })
+
+  test('returns null when not in waiting phase', () => {
+    state.phase = 'playing'
+    
+    const result = addAIPlayer(state)
+    
+    expect(result).toBeNull()
+  })
+
+  test('first AI becomes dealer', () => {
+    addAIPlayer(state)
+    
+    expect(state.dealerId).toBe(state.players[0].id)
+  })
+
+  test('allows mixing AI and human players', () => {
+    handleJoin(state, 'p1', 'Human')
+    addAIPlayer(state)
+    
+    expect(state.players.length).toBe(2)
+    expect(state.players[0].isAI).toBeUndefined()
+    expect(state.players[1].isAI).toBe(true)
   })
 })

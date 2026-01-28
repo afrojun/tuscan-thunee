@@ -31,6 +31,7 @@ export interface Player {
   team: 0 | 1
   connected: boolean
   isSpectator: boolean
+  isAI?: boolean
 }
 
 export interface Trick {
@@ -161,6 +162,7 @@ export interface GameState {
 export type ClientMessage =
   | { type: 'join'; name: string; playerCount?: 2 | 4; existingPlayerId?: string }
   | { type: 'start' }
+  | { type: 'add-ai'; team?: 0 | 1 }
   | { type: 'bid'; amount: number }
   | { type: 'pass' }
   | { type: 'preselect-trump'; suit: Suit }  // Trumper pre-selects during bidding window

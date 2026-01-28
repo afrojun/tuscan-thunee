@@ -8,9 +8,10 @@ interface LobbyProps {
   hasJoined: boolean
   onJoin: (name: string) => void
   onStart: () => void
+  onAddAI: () => void
 }
 
-export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyProps) {
+export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart, onAddAI }: LobbyProps) {
   const [name, setName] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -62,7 +63,7 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyPr
                 } ${!p.connected ? 'opacity-50' : ''}`}
               >
                 <span className="text-retro-black">
-                  {p.name} {p.id === gameState.dealerId && '👑'}
+                  {p.name} {p.isAI && <span title="AI Player">🤖</span>} {p.id === gameState.dealerId && '👑'}
                 </span>
                 <span className="text-gray-500 text-xs ml-2">
                   Team {p.team + 1}
@@ -97,6 +98,14 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart }: LobbyPr
               <p className="font-mono text-sm text-gray-600 text-center">
                 {canStart ? 'Ready to start!' : 'Waiting for players...'}
               </p>
+              {!canStart && expectedPlayers !== null && (
+                <button 
+                  className="btn-retro w-full opacity-80"
+                  onClick={onAddAI}
+                >
+                  + ADD AI PLAYER
+                </button>
+              )}
               {canStart && (
                 <button 
                   className="btn-retro w-full"
