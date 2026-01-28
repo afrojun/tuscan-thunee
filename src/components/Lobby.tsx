@@ -13,6 +13,7 @@ interface LobbyProps {
 
 export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart, onAddAI }: LobbyProps) {
   const [name, setName] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,8 +22,10 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart, onAddAI }
     }
   }
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href)
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const currentPlayers = gameState?.players.length ?? 0
@@ -43,9 +46,10 @@ export function Lobby({ gameId, gameState, hasJoined, onJoin, onStart, onAddAI }
             </span>
             <button
               onClick={copyLink}
-              className="px-2 py-1 text-xs bg-felt text-retro-cream border border-retro-black"
+              className="px-2 py-1 text-xs bg-felt text-retro-cream border border-retro-black transition-all"
+              title="Copy game link"
             >
-              COPY
+              {copied ? '✓ COPIED!' : 'COPY'}
             </button>
           </div>
         </div>

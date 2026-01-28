@@ -58,7 +58,7 @@ export function Home() {
         <div className="border-t-2 border-retro-black pt-6 space-y-3">
           <h2 className="font-retro text-xs text-retro-black">JOIN GAME</h2>
 
-          <form onSubmit={handleJoin} className="space-y-3">
+          <form onSubmit={handleJoin} className="space-y-2">
             <input
               type="text"
               value={joinCode}
@@ -68,6 +68,9 @@ export function Home() {
                          border-2 border-retro-black text-center tracking-widest
                          placeholder:text-gray-400 placeholder:tracking-normal placeholder:text-sm"
             />
+            <p className="font-mono text-xs text-gray-500 text-center">
+              6-letter code from game creator
+            </p>
             <button
               type="submit"
               className="btn-retro w-full"
