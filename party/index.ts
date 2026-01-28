@@ -1,7 +1,7 @@
 import type * as Party from "partykit/server"
-import type { GameState, ClientMessage, ServerMessage, Card, Suit } from "../src/game/types"
+import type { GameState, ClientMessage, ServerMessage, Suit } from "../src/game/types"
 import { createInitialState, serializeState, deserializeState } from "../src/game/state"
-import { getTrickEvents, CALL_TIMER_MS, TRICK_DISPLAY_MS } from "./helpers"
+import { CALL_TIMER_MS, TRICK_DISPLAY_MS, filterStateForPlayer } from "./helpers"
 import { handleJoin as handleJoinLogic, canStart } from "./handlers/lobby"
 import { handleSetTrump as handleSetTrumpLogic, handleCallThunee as handleCallThuneeLogic } from "./handlers/calling"
 import { 
@@ -21,29 +21,77 @@ import {
   applyChallengeResult
 } from "./handlers/challenge"
 import {
-  calculateTeamJodhiPoints,
-  evaluateThunee,
-  calculateNormalScoring,
-  awardLastTrickBonus,
-  logRoundEnd,
   checkGameOver as checkGameOverLogic,
   rotateDealerAndReset as rotateDealerAndResetLogic,
-  setupSecondRound,
   evaluateKhanaak,
-  applyKhanaakResult
+  applyKhanaakResult,
+  processEndRound
 } from "./handlers/round"
 import { setupBiddingPhase } from "./handlers/dealing"
 
-interface ConnectionState {
+type AlarmType = 'bidding' | 'trick-display'
+
+/**
+ * Message handler context passed to each handler.
+ */
+interface MessageContext {
+  server: ThuneeServer
   playerId: string
+  conn: Party.Connection
 }
 
-type AlarmType = 'bidding' | 'trick-display'
+/**
+ * Message handler function type.
+ */
+type MessageHandler<T extends ClientMessage = ClientMessage> = (
+  ctx: MessageContext,
+  msg: T
+) => void | Promise<void>
 
 export default class ThuneeServer implements Party.Server {
   state: GameState
   connectionPlayerMap: Map<string, string> = new Map() // connectionId -> playerId
   pendingAlarmType: AlarmType | null = null
+
+  /** Message handler registry */
+  private handlers: Map<ClientMessage['type'], MessageHandler> = new Map([
+    ['join', (ctx, msg) => {
+      if (msg.type !== 'join') return
+      this.handleJoin(ctx.playerId, msg.name, msg.playerCount, ctx.conn, msg.existingPlayerId)
+    }],
+    ['start', () => this.handleStart()],
+    ['bid', (ctx, msg) => {
+      if (msg.type !== 'bid') return
+      this.handleBid(ctx.playerId, msg.amount)
+    }],
+    ['pass', (ctx) => this.handlePass(ctx.playerId)],
+    ['preselect-trump', (ctx, msg) => {
+      if (msg.type !== 'preselect-trump') return
+      this.handlePreselectTrump(ctx.playerId, msg.suit)
+    }],
+    ['set-trump', (ctx, msg) => {
+      if (msg.type !== 'set-trump') return
+      this.handleSetTrump(ctx.playerId, msg.suit, msg.lastCard)
+    }],
+    ['call-thunee', (ctx) => this.handleCallThunee(ctx.playerId)],
+    ['call-jodhi', (ctx, msg) => {
+      if (msg.type !== 'call-jodhi') return
+      this.handleCallJodhi(ctx.playerId, msg.suit, msg.withJack)
+    }],
+    ['play-card', (ctx, msg) => {
+      if (msg.type !== 'play-card') return
+      this.handlePlayCard(ctx.playerId, msg.card)
+    }],
+    ['challenge-play', (ctx, msg) => {
+      if (msg.type !== 'challenge-play') return
+      this.handleChallengePlay(ctx.playerId, msg.accusedId)
+    }],
+    ['challenge-jodhi', (ctx, msg) => {
+      if (msg.type !== 'challenge-jodhi') return
+      this.handleChallengeJodhi(ctx.playerId, msg.accusedId, msg.suit)
+    }],
+    ['call-khanaak', (ctx) => this.handleCallKhanaak(ctx.playerId)],
+  ])
 
   constructor(readonly room: Party.Room) {
     this.state = createInitialState(room.id, 4)
@@ -68,28 +116,8 @@ export default class ThuneeServer implements Party.Server {
     await this.room.storage.put("state", serializeState(this.state))
   }
 
-  /**
-   * Filter game state for a specific player.
-   * Hides other players' hands to prevent cheating via WebSocket inspection.
-   */
   getStateForPlayer(playerId: string): GameState {
-    return {
-      ...this.state,
-      players: this.state.players.map(p => {
-        // Only show your own hand
-        if (p.id === playerId) {
-          return p
-        }
-        
-        // Hide all other hands - only show card count via placeholder cards
-        return {
-          ...p,
-          hand: Array(p.hand.length).fill({ suit: 'spades', rank: 'Q' } as Card)
-        }
-      }),
-      // Hide the deck (used in 2-player mode)
-      deck: [],
-    }
+    return filterStateForPlayer(this.state, playerId)
   }
 
   broadcast(msg: ServerMessage, exclude?: string) {
@@ -168,43 +196,10 @@ export default class ThuneeServer implements Party.Server {
     const playerId = this.connectionPlayerMap.get(sender.id)
     if (!playerId) return
 
-    switch (msg.type) {
-      case "join":
-        this.handleJoin(playerId, msg.name, msg.playerCount, sender, msg.existingPlayerId)
-        break
-      case "start":
-        this.handleStart()
-        break
-      case "bid":
-        this.handleBid(playerId, msg.amount)
-        break
-      case "pass":
-        this.handlePass(playerId)
-        break
-      case "preselect-trump":
-        this.handlePreselectTrump(playerId, msg.suit)
-        break
-      case "set-trump":
-        this.handleSetTrump(playerId, msg.suit, msg.lastCard)
-        break
-      case "call-thunee":
-        this.handleCallThunee(playerId)
-        break
-      case "call-jodhi":
-        this.handleCallJodhi(playerId, msg.suit, msg.withJack)
-        break
-      case "play-card":
-        this.handlePlayCard(playerId, msg.card)
-        break
-      case "challenge-play":
-        this.handleChallengePlay(playerId, msg.accusedId)
-        break
-      case "challenge-jodhi":
-        this.handleChallengeJodhi(playerId, msg.accusedId, msg.suit)
-        break
-      case "call-khanaak":
-        this.handleCallKhanaak(playerId)
-        break
+    // Dispatch to registered handler
+    const handler = this.handlers.get(msg.type)
+    if (handler) {
+      handler({ server: this, playerId, conn: sender }, msg)
     }
 
     this.saveState()
@@ -317,48 +312,7 @@ export default class ThuneeServer implements Party.Server {
   }
 
   endRound() {
-    const trickEvents = getTrickEvents(this.state.eventLog)
-    awardLastTrickBonus(this.state)
-
-    // 2-player mode: check for Thunee in Round 1
-    if (this.state.playerCount === 2 && this.state.dealRound === 1 && this.state.thuneeCallerId) {
-      const thuneeResult = evaluateThunee(this.state, trickEvents)
-      if (thuneeResult) {
-        this.state.teams[thuneeResult.winningTeam].balls += 4
-        this.state.lastBallAward = { team: thuneeResult.winningTeam, amount: 4, reason: 'thunee' }
-        logRoundEnd(this.state, thuneeResult.winningTeam, 4, 'thunee')
-      }
-      if (this.checkGameOver()) return
-      this.state.phase = "round-end"
-      this.rotateDealerAndReset()
-      return
-    }
-
-    // 2-player mode: after Round 1 (no Thunee), go to Round 2
-    if (this.state.playerCount === 2 && this.state.dealRound === 1) {
-      this.state.dealRound = 2
-      setupSecondRound(this.state)
-      return
-    }
-
-    // Award balls (after Round 2 in 2-player, or after 6 tricks in 4-player)
-    const thuneeResult = evaluateThunee(this.state, trickEvents)
-    
-    if (thuneeResult) {
-      this.state.teams[thuneeResult.winningTeam].balls += 4
-      this.state.lastBallAward = { team: thuneeResult.winningTeam, amount: 4, reason: 'thunee' }
-      logRoundEnd(this.state, thuneeResult.winningTeam, 4, 'thunee')
-    } else {
-      const { trumpTeamJodhi, countingTeamJodhi } = calculateTeamJodhiPoints(this.state)
-      const scoringResult = calculateNormalScoring(this.state, trumpTeamJodhi, countingTeamJodhi)
-      this.state.teams[scoringResult.winningTeam].balls += scoringResult.ballsWon
-      this.state.lastBallAward = { team: scoringResult.winningTeam, amount: scoringResult.ballsWon, reason: 'normal' }
-      logRoundEnd(this.state, scoringResult.winningTeam, scoringResult.ballsWon, 'normal')
-    }
-
-    if (this.checkGameOver()) return
-    this.state.phase = "round-end"
-    this.rotateDealerAndReset()
+    processEndRound(this.state)
   }
 
   checkGameOver(): boolean {

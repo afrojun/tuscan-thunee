@@ -275,3 +275,61 @@ export function applyKhanaakResult(
     logRoundEnd(state, opponentTeam, 4, 'khanaak')
   }
 }
+
+/**
+ * Result of processing round end.
+ */
+export type EndRoundResult =
+  | { action: 'game-over' }
+  | { action: 'next-round' }
+  | { action: 'second-deal' } // 2-player mode: go to round 2
+
+/**
+ * Process end of round - awards balls, checks game over, prepares for next round.
+ * Consolidates all end-round logic into a single function.
+ */
+export function processEndRound(state: GameState): EndRoundResult {
+  const trickEvents = getTrickEvents(state.eventLog)
+  awardLastTrickBonus(state)
+
+  // 2-player mode: check for Thunee in Round 1
+  if (state.playerCount === 2 && state.dealRound === 1 && state.thuneeCallerId) {
+    const thuneeResult = evaluateThunee(state, trickEvents)
+    if (thuneeResult) {
+      state.teams[thuneeResult.winningTeam].balls += 4
+      state.lastBallAward = { team: thuneeResult.winningTeam, amount: 4, reason: 'thunee' }
+      logRoundEnd(state, thuneeResult.winningTeam, 4, 'thunee')
+    }
+    if (checkGameOver(state)) return { action: 'game-over' }
+    state.phase = 'round-end'
+    rotateDealerAndReset(state)
+    return { action: 'next-round' }
+  }
+
+  // 2-player mode: after Round 1 (no Thunee), go to Round 2
+  if (state.playerCount === 2 && state.dealRound === 1) {
+    state.dealRound = 2
+    setupSecondRound(state)
+    return { action: 'second-deal' }
+  }
+
+  // Award balls (after Round 2 in 2-player, or after 6 tricks in 4-player)
+  const thuneeResult = evaluateThunee(state, trickEvents)
+
+  if (thuneeResult) {
+    state.teams[thuneeResult.winningTeam].balls += 4
+    state.lastBallAward = { team: thuneeResult.winningTeam, amount: 4, reason: 'thunee' }
+    logRoundEnd(state, thuneeResult.winningTeam, 4, 'thunee')
+  } else {
+    const { trumpTeamJodhi, countingTeamJodhi } = calculateTeamJodhiPoints(state)
+    const scoringResult = calculateNormalScoring(state, trumpTeamJodhi, countingTeamJodhi)
+    state.teams[scoringResult.winningTeam].balls += scoringResult.ballsWon
+    state.lastBallAward = { team: scoringResult.winningTeam, amount: scoringResult.ballsWon, reason: 'normal' }
+    logRoundEnd(state, scoringResult.winningTeam, scoringResult.ballsWon, 'normal')
+  }
+
+  if (checkGameOver(state)) return { action: 'game-over' }
+  state.phase = 'round-end'
+  rotateDealerAndReset(state)
+  return { action: 'next-round' }
+}
