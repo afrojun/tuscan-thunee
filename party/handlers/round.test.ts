@@ -6,7 +6,8 @@ import {
   awardLastTrickBonus,
   checkGameOver,
   rotateDealerAndReset,
-  evaluateKhanaak
+  evaluateKhanaak,
+  processEndRound
 } from './round'
 import { createInitialState, createEmptyTrick } from '../../src/game/state'
 import type { GameState, Card, Trick } from '../../src/game/types'
@@ -286,5 +287,143 @@ describe('evaluateKhanaak', () => {
       expect(result.isBackward).toBe(true)
       expect(result.ballsWon).toBe(6)
     }
+  })
+})
+
+describe('processEndRound', () => {
+  let state: GameState
+
+  beforeEach(() => {
+    state = createInitialState('test-game', 4)
+    state.players = [
+      { id: 'p1', name: 'Alice', hand: [], team: 0, connected: true, isSpectator: false },
+      { id: 'p2', name: 'Bob', hand: [], team: 1, connected: true, isSpectator: false },
+      { id: 'p3', name: 'Charlie', hand: [], team: 0, connected: true, isSpectator: false },
+      { id: 'p4', name: 'Diana', hand: [], team: 1, connected: true, isSpectator: false },
+    ]
+    state.dealerId = 'p1'
+    state.trumpCallerId = 'p1'
+    state.gameRound = 1
+    // Add 6 trick events for a complete round
+    for (let i = 0; i < 6; i++) {
+      state.eventLog.push({
+        type: 'trick',
+        data: { cards: [], leadSuit: 'hearts', winnerId: 'p1' },
+        roundNumber: 1,
+        timestamp: Date.now() + i
+      })
+    }
+  })
+
+  test('awards last trick bonus (affects scoring)', () => {
+    // Set up so that team 0 would lose without the +10 bonus but wins with it
+    // Target = 105 - 0 (no bid) = 105, so counting team (1) needs 105 to win
+    state.bidState.currentBid = 0
+    state.teams[0].cardPoints = 0 // Trump team
+    state.teams[1].cardPoints = 95 // Counting team - would win at 105
+    // Last trick winner (p1, team 0) gets +10, making team 0 still win (105 > 95+0)
+    
+    processEndRound(state)
+    
+    // Team 0 (trump) wins because counting team (95) < target (105)
+    expect(state.teams[0].balls).toBe(1)
+    expect(state.lastBallAward?.team).toBe(0)
+  })
+
+  test('normal scoring - trump team wins', () => {
+    state.bidState.currentBid = 30
+    state.teams[0].cardPoints = 60 // Trump team
+    state.teams[1].cardPoints = 30 // Counting team under target (75)
+    
+    const result = processEndRound(state)
+    
+    expect(result.action).toBe('next-round')
+    expect(state.teams[0].balls).toBe(1)
+    expect(state.lastBallAward?.team).toBe(0)
+  })
+
+  test('normal scoring - counting team wins (call and lost)', () => {
+    state.bidState.currentBid = 40
+    state.teams[0].cardPoints = 30 // Trump team
+    state.teams[1].cardPoints = 70 // Counting team >= target (65)
+    
+    processEndRound(state)
+    
+    expect(state.teams[1].balls).toBe(2) // Call and lost = 2 balls
+  })
+
+  test('thunee success awards 4 balls', () => {
+    state.thuneeCallerId = 'p1' // Team 0 called thunee
+    // All tricks won by team 0 (already set up in beforeEach)
+    
+    processEndRound(state)
+    
+    expect(state.teams[0].balls).toBe(4)
+    expect(state.lastBallAward?.reason).toBe('thunee')
+  })
+
+  test('thunee failure awards 4 balls to opponent', () => {
+    state.thuneeCallerId = 'p1' // Team 0 called thunee
+    // Change one trick to be won by opponent
+    state.eventLog[3] = {
+      type: 'trick',
+      data: { cards: [], leadSuit: 'hearts', winnerId: 'p2' },
+      roundNumber: 1,
+      timestamp: Date.now()
+    }
+    
+    processEndRound(state)
+    
+    expect(state.teams[1].balls).toBe(4) // Opponent wins
+  })
+
+  test('2-player mode goes to second deal after round 1', () => {
+    state.playerCount = 2
+    state.players = state.players.slice(0, 2)
+    state.dealRound = 1
+    state.thuneeCallerId = null
+    // Create a mock deck for second round dealing
+    state.deck = Array(24).fill({ suit: 'hearts', rank: 'J' })
+    
+    const result = processEndRound(state)
+    
+    expect(result.action).toBe('second-deal')
+    expect(state.dealRound).toBe(2)
+    expect(state.phase).toBe('playing')
+  })
+
+  test('game over when team reaches 12 balls', () => {
+    state.teams[0].balls = 11
+    state.bidState.currentBid = 0
+    state.teams[1].cardPoints = 50 // Under target, team 0 wins 1 ball
+    
+    const result = processEndRound(state)
+    
+    expect(result.action).toBe('game-over')
+    expect(state.phase).toBe('game-over')
+    expect(state.teams[0].balls).toBe(12)
+  })
+
+  test('rotates dealer and resets for next round', () => {
+    state.bidState.currentBid = 0
+    state.teams[0].cardPoints = 60
+    state.teams[1].cardPoints = 40
+    
+    processEndRound(state)
+    
+    expect(state.dealerId).toBe('p2') // Rotated
+    expect(state.gameRound).toBe(2) // Incremented
+    expect(state.teams[0].cardPoints).toBe(0) // Reset
+    expect(state.phase).toBe('round-end')
+  })
+
+  test('logs round end event', () => {
+    state.bidState.currentBid = 30
+    state.teams[1].cardPoints = 80 // Counting team wins
+    
+    processEndRound(state)
+    
+    const roundEndEvent = state.eventLog.find(e => e.type === 'round-end')
+    expect(roundEndEvent).toBeDefined()
   })
 })

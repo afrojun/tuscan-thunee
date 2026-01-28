@@ -1,12 +1,13 @@
 import type * as Party from "partykit/server"
-import type { GameState, ClientMessage, ServerMessage, Suit } from "../src/game/types"
+import type { GameState, ClientMessage, ServerMessage, Suit, Card } from "../src/game/types"
 import { createInitialState, serializeState, deserializeState } from "../src/game/state"
 import { CALL_TIMER_MS, TRICK_DISPLAY_MS, filterStateForPlayer } from "./helpers"
+import { handler, type MessageContext, type MessageHandler } from "./registry"
 import { handleJoin as handleJoinLogic, canStart } from "./handlers/lobby"
 import { handleSetTrump as handleSetTrumpLogic, handleCallThunee as handleCallThuneeLogic } from "./handlers/calling"
-import { 
-  handleBid as handleBidLogic, 
-  handlePass as handlePassLogic, 
+import {
+  handleBid as handleBidLogic,
+  handlePass as handlePassLogic,
   handlePreselectTrump as handlePreselectTrumpLogic,
   handleTimerExpired as handleTimerExpiredLogic
 } from "./handlers/bidding"
@@ -31,50 +32,13 @@ import { setupBiddingPhase } from "./handlers/dealing"
 
 type AlarmType = 'bidding' | 'trick-display'
 
-/**
- * Message handler context passed to each handler.
- */
-interface MessageContext {
-  server: ThuneeServer
-  playerId: string
-  conn: Party.Connection
-}
-
-/**
- * Extract specific message type from the ClientMessage union.
- */
-type MessageOfType<T extends ClientMessage['type']> = Extract<ClientMessage, { type: T }>
-
-/**
- * Typed handler that knows its exact message shape.
- */
-type TypedHandler<T extends ClientMessage['type']> = (
-  ctx: MessageContext,
-  msg: MessageOfType<T>
-) => void | Promise<void>
-
-/**
- * Generic handler for the Map (erases specific type info).
- */
-type MessageHandler = (ctx: MessageContext, msg: ClientMessage) => void | Promise<void>
-
-/**
- * Type-safe helper to register a handler with correct message typing.
- */
-function handler<T extends ClientMessage['type']>(
-  type: T,
-  fn: TypedHandler<T>
-): [T, MessageHandler] {
-  return [type, fn as MessageHandler]
-}
-
 export default class ThuneeServer implements Party.Server {
   state: GameState
   connectionPlayerMap: Map<string, string> = new Map() // connectionId -> playerId
   pendingAlarmType: AlarmType | null = null
 
   /** Message handler registry - type-safe via handler() helper */
-  private handlers = new Map<ClientMessage['type'], MessageHandler>([
+  private handlers = new Map<ClientMessage['type'], MessageHandler<ThuneeServer>>([
     handler('join', (ctx, msg) => {
       this.handleJoin(ctx.playerId, msg.name, msg.playerCount, ctx.conn, msg.existingPlayerId)
     }),
@@ -141,10 +105,10 @@ export default class ThuneeServer implements Party.Server {
       const playerId = this.connectionPlayerMap.get(conn.id)
       if (playerId) {
         const filteredState = this.getStateForPlayer(playerId)
-        conn.send(JSON.stringify({ 
-          type: "state", 
-          state: filteredState, 
-          playerId 
+        conn.send(JSON.stringify({
+          type: "state",
+          state: filteredState,
+          playerId
         }))
       }
     }
@@ -206,7 +170,7 @@ export default class ThuneeServer implements Party.Server {
 
   handleJoin(playerId: string, name: string, playerCount: 2 | 4 | undefined, conn: Party.Connection, existingPlayerId?: string) {
     const result = handleJoinLogic(this.state, playerId, name, playerCount, existingPlayerId)
-    
+
     // Update connection mapping based on result
     if (result.type === 'reconnected') {
       this.connectionPlayerMap.set(conn.id, result.playerId)
