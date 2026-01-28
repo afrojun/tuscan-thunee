@@ -314,7 +314,7 @@ export function GameBoard({ gameState, playerId, onAction, cardBackStyle = 'clas
             />
           )}
 
-          {gameState.phase === 'round-end' && (
+          {gameState.phase === 'round-end' && !showBallCelebration && (
             <div className="card-container p-4 text-center space-y-3">
               <p className="font-retro text-xs text-retro-black flex items-center justify-center gap-2">
                 <span className="text-base">🏁</span>
@@ -332,7 +332,7 @@ export function GameBoard({ gameState, playerId, onAction, cardBackStyle = 'clas
             </div>
           )}
 
-          {gameState.phase === 'game-over' && (
+          {gameState.phase === 'game-over' && !showBallCelebration && (
             <div className="card-container p-4 text-center space-y-3">
               <p className="font-retro text-sm text-retro-gold flex items-center justify-center gap-2">
                 <span className="text-xl">🏆</span>
