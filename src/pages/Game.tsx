@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Lobby } from '@/components/Lobby'
 import { GameBoard } from '@/components/GameBoard'
 import { usePartySocket } from '@/hooks/usePartySocket'
+import type { CardBackStyle } from '@/lib/cards/cardBackStyles'
 
 function getStoredPlayerId(gameId: string): string | null {
   return localStorage.getItem(`thunee-player-${gameId}`)
@@ -24,6 +25,7 @@ export function Game() {
   const { gameId } = useParams<{ gameId: string }>()
   const [searchParams] = useSearchParams()
   const playerCount = (searchParams.get('players') === '2' ? 2 : 4) as 2 | 4
+  const cardBackStyle = (searchParams.get('cardBack') as CardBackStyle) || 'classic'
   
   const [playerName, setPlayerName] = useState(() => getStoredPlayerName(gameId!) || '')
   const [hasJoined, setHasJoined] = useState(false)
@@ -102,6 +104,7 @@ export function Game() {
       gameState={gameState}
       playerId={playerId}
       onAction={send}
+      cardBackStyle={cardBackStyle}
     />
   )
 }

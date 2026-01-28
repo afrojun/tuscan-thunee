@@ -1,5 +1,6 @@
 import type { Suit } from './types'
 import { SUIT_SYMBOLS } from './types'
+import type { CardBackStyle } from './cardBackStyles'
 
 const SUIT_CSS_COLORS: Record<Suit, string> = {
   hearts: 'text-red-600',
@@ -16,6 +17,7 @@ interface CardProps {
   selected?: boolean
   faceDown?: boolean
   small?: boolean
+  backStyle?: CardBackStyle
 }
 
 export function Card({ 
@@ -24,7 +26,8 @@ export function Card({
   disabled = false, 
   selected = false,
   faceDown = false,
-  small = false 
+  small = false,
+  backStyle = 'classic'
 }: CardProps) {
   const sizeClasses = small 
     ? 'w-12 h-16' 
@@ -35,7 +38,7 @@ export function Card({
       <div 
         className={`${sizeClasses} rounded-lg shadow-retro-sm overflow-hidden border border-gray-300 bg-white p-1`}
       >
-        <CardBackPattern />
+        <CardBackPattern style={backStyle} />
       </div>
     )
   }
@@ -76,7 +79,23 @@ export function Card({
   )
 }
 
-function CardBackPattern() {
+function CardBackPattern({ style = 'classic' }: { style: CardBackStyle }) {
+  switch (style) {
+    case 'arcade':
+      return <ArcadeCardBack />
+    case 'ornamental':
+      return <OrnamentalCardBack />
+    case 'minimal':
+      return <MinimalCardBack />
+    case 'felt':
+      return <FeltCardBack />
+    case 'classic':
+    default:
+      return <ClassicCardBack />
+  }
+}
+
+function ClassicCardBack() {
   return (
     <div 
       className="w-full h-full rounded border-2 border-red-800 overflow-hidden"
@@ -109,7 +128,124 @@ function CardBackPattern() {
   )
 }
 
-export function CardBack({ small = false }: { small?: boolean }) {
+function ArcadeCardBack() {
+  return (
+    <div
+      className="w-full h-full rounded border-2 border-yellow-500 overflow-hidden flex items-center justify-center"
+      style={{
+        backgroundColor: '#1a1a1a',
+        backgroundImage: `
+          repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 1px,
+            rgba(255, 255, 0, 0.1) 1px,
+            rgba(255, 255, 0, 0.1) 2px
+          )
+        `,
+      }}
+    >
+      <div className="text-center">
+        <div 
+          className="text-3xl font-bold"
+          style={{
+            color: '#ffff00',
+            textShadow: '0 0 10px rgba(255, 255, 0, 0.8), 0 0 20px rgba(255, 165, 0, 0.6)',
+          }}
+        >
+          ◆
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrnamentalCardBack() {
+  return (
+    <div 
+      className="w-full h-full rounded border-2 border-yellow-600 overflow-hidden flex items-center justify-center relative"
+      style={{
+        backgroundColor: '#2d5016',
+        backgroundImage: `
+          repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 2px,
+            rgba(212, 168, 71, 0.05) 2px,
+            rgba(212, 168, 71, 0.05) 4px
+          )
+        `,
+      }}
+    >
+      {/* Gold corner decorations */}
+      <div 
+        className="absolute"
+        style={{
+          width: '100%',
+          height: '100%',
+          backgroundImage: `
+            linear-gradient(135deg, transparent 6px, #d4a847 6px, #d4a847 8px, transparent 8px),
+            linear-gradient(-135deg, transparent 6px, #d4a847 6px, #d4a847 8px, transparent 8px),
+            linear-gradient(45deg, transparent 6px, #d4a847 6px, #d4a847 8px, transparent 8px),
+            linear-gradient(-45deg, transparent 6px, #d4a847 6px, #d4a847 8px, transparent 8px)
+          `,
+          backgroundPosition: 'top left, top right, bottom left, bottom right',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      <div className="text-center relative z-10">
+        <div className="text-4xl font-bold text-yellow-600" style={{ textShadow: '0 0 8px rgba(212, 168, 71, 0.6)' }}>
+          ◆
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MinimalCardBack() {
+  return (
+    <div 
+      className="w-full h-full rounded border-2 border-yellow-600 overflow-hidden flex items-center justify-center"
+      style={{
+        backgroundColor: '#1a1a1a',
+      }}
+    >
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-8 h-8 border-2 border-yellow-600" style={{ aspectRatio: '1' }} />
+        <div className="w-4 h-px bg-yellow-600" />
+      </div>
+    </div>
+  )
+}
+
+function FeltCardBack() {
+  return (
+    <div 
+      className="w-full h-full rounded border-2 border-yellow-600 overflow-hidden flex items-center justify-center"
+      style={{
+        backgroundColor: '#1a4d2e',
+        backgroundImage: `
+          repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.1) 2px,
+            rgba(0, 0, 0, 0.1) 4px
+          )
+        `,
+      }}
+    >
+      <div className="text-center">
+        <div className="text-3xl font-bold text-yellow-600" style={{ textShadow: '0 0 6px rgba(212, 168, 71, 0.5)' }}>
+          ◆
+        </div>
+        <p className="text-xs text-yellow-600 mt-1 font-retro">THUNEE</p>
+      </div>
+    </div>
+  )
+}
+
+export function CardBack({ small = false, style = 'classic' }: { small?: boolean; style?: CardBackStyle }) {
   const sizeClasses = small 
     ? 'w-12 h-16' 
     : 'w-16 h-24 sm:w-20 sm:h-28'
@@ -118,7 +254,7 @@ export function CardBack({ small = false }: { small?: boolean }) {
     <div 
       className={`${sizeClasses} rounded-lg shadow-retro-sm overflow-hidden border border-gray-300 bg-white p-1`}
     >
-      <CardBackPattern />
+      <CardBackPattern style={style} />
     </div>
   )
 }

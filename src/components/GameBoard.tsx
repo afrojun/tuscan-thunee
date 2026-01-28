@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameState, ClientMessage, Card as CardType, Suit } from '@/game/types'
+import type { CardBackStyle } from '@/lib/cards/cardBackStyles'
 import { PlayerHand } from './PlayerHand'
 import { TrickArea } from './TrickArea'
 import { ScoreBoard } from './ScoreBoard'
@@ -18,9 +19,10 @@ interface GameBoardProps {
   gameState: GameState
   playerId: string
   onAction: (msg: ClientMessage) => void
+  cardBackStyle?: CardBackStyle
 }
 
-export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
+export function GameBoard({ gameState, playerId, onAction, cardBackStyle = 'classic' }: GameBoardProps) {
   const [dismissedChallengeResult, setDismissedChallengeResult] = useState(false)
   const [showChallengeModal, setShowChallengeModal] = useState(false)
   const [showBallCelebration, setShowBallCelebration] = useState(false)
@@ -254,7 +256,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
         </p>
         <div className="flex gap-0.5">
           {Array.from({ length: topPlayer?.hand.length ?? 0 }).map((_, i) => (
-            <CardBack key={i} small />
+            <CardBack key={i} small style={cardBackStyle} />
           ))}
         </div>
       </div>
@@ -275,7 +277,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             </p>
             <div className="flex flex-col gap-0.5">
               {Array.from({ length: leftPlayer.hand.length }).map((_, i) => (
-                <CardBack key={i} small />
+                <CardBack key={i} small style={cardBackStyle} />
               ))}
             </div>
           </div>
@@ -308,6 +310,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
               trick={gameState.currentTrick}
               players={gameState.players}
               showingResult={gameState.phase === 'trick-complete'}
+              cardBackStyle={cardBackStyle}
             />
           )}
 
@@ -353,7 +356,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             </p>
             <div className="flex flex-col gap-0.5">
               {Array.from({ length: rightPlayer.hand.length }).map((_, i) => (
-                <CardBack key={i} small />
+                <CardBack key={i} small style={cardBackStyle} />
               ))}
             </div>
           </div>
@@ -374,6 +377,7 @@ export function GameBoard({ gameState, playerId, onAction }: GameBoardProps) {
             isCurrentPlayer={isCurrentPlayer && gameState.phase === 'playing'}
             disabled={gameState.phase !== 'playing'}
             dealing={isDealing}
+            cardBackStyle={cardBackStyle}
           />
           
           {/* Action buttons - below cards */}

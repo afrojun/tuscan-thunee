@@ -1,15 +1,17 @@
 import { Card } from '@/lib/cards'
 import { FloatingScore } from './FloatingScore'
 import type { Trick, Player } from '@/game/types'
+import type { CardBackStyle } from '@/lib/cards/cardBackStyles'
 import { CARD_VALUES } from '@/game/types'
 
 interface TrickAreaProps {
   trick: Trick
   players: Player[]
   showingResult?: boolean
+  cardBackStyle?: CardBackStyle
 }
 
-export function TrickArea({ trick, players, showingResult = false }: TrickAreaProps) {
+export function TrickArea({ trick, players, showingResult = false, cardBackStyle = 'classic' }: TrickAreaProps) {
   // For 4 players: position cards at top, right, bottom, left
   // For 2 players: position at top and bottom
   const getPosition = (playerIndex: number, totalPlayers: number) => {
@@ -67,7 +69,7 @@ export function TrickArea({ trick, players, showingResult = false }: TrickAreaPr
             className={`absolute ${position} ${isLatestCard ? 'animate-card-fly' : ''} ${isWinner ? 'animate-winner-glow rounded-lg' : ''}`}
             style={isLatestCard ? { '--start-transform': flyOrigin } as React.CSSProperties : undefined}
           >
-            <Card card={card} disabled />
+            <Card card={card} disabled backStyle={cardBackStyle} />
           </div>
         )
       })}

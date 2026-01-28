@@ -1,5 +1,6 @@
 import { Card } from '@/lib/cards'
 import type { Card as CardType } from '@/game/types'
+import type { CardBackStyle } from '@/lib/cards/cardBackStyles'
 
 interface PlayerHandProps {
   cards: CardType[]
@@ -7,9 +8,10 @@ interface PlayerHandProps {
   isCurrentPlayer: boolean
   disabled?: boolean
   dealing?: boolean
+  cardBackStyle?: CardBackStyle
 }
 
-export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled, dealing = false }: PlayerHandProps) {
+export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled, dealing = false, cardBackStyle = 'classic' }: PlayerHandProps) {
   const cardCount = cards.length
   
   // Calculate fan angles - spread cards across ~60 degrees total
@@ -50,10 +52,11 @@ export function PlayerHand({ cards, onPlayCard, isCurrentPlayer, disabled, deali
               {/* Card that lifts on hover */}
               <div className="transition-transform duration-150 group-hover:-translate-y-4 group-hover:z-50">
                 <Card
-                  card={card}
-                  onClick={() => onPlayCard(card)}
-                  disabled={disabled || !isCurrentPlayer}
-                />
+                    card={card}
+                    onClick={() => onPlayCard(card)}
+                    disabled={disabled || !isCurrentPlayer}
+                    backStyle={cardBackStyle}
+                  />
               </div>
             </div>
           )
